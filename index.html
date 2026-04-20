@@ -1,0 +1,3209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="favicon2.png">
+    <title>Simga's RNG</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700;900&display=swap');
+
+        :root {
+            --bg-color: #0d0d12;
+            --panel-bg: rgba(255, 255, 255, 0.05);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-muted: #888899;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #1a1a24 0%, #0d0d12 100%);
+            transition: filter 0.2s, transform 0.1s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0) rotate(0); }
+            25% { transform: translate(-5px, 5px) rotate(-1deg); }
+            50% { transform: translate(5px, -5px) rotate(1deg); }
+            75% { transform: translate(-5px, -5px) rotate(0deg); }
+        }
+
+        @keyframes heavyShake {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            10% { transform: translate(-7px, 7px) scale(1.02); }
+            20% { transform: translate(7px, -7px) scale(0.98); }
+            30% { transform: translate(-7px, -7px) scale(1.05); }
+            40% { transform: translate(7px, 7x) scale(0.95); }
+            50% { transform: translate(-5px, 5px) scale(1.01); }
+        }
+
+        @keyframes godShake {
+            0% { transform: translate(0, 0) rotate(0); }
+            25% { transform: translate(-10px, 10px) rotate(-2deg); }
+            50% { transform: translate(10px, -10px) rotate(2deg); }
+            75% { transform: translate(-10px, -10px) rotate(0deg); }
+            100% { transform: translate(0, 0) rotate(0); }
+        }
+
+        @keyframes flash {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(3) contrast(1.5); }
+            100% { filter: brightness(1); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes rainbowShift {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+
+        .shake-active { animation: shake 0.4s ease-in-out; }
+        .heavy-shake-active { animation: heavyShake 0.6s cubic-bezier(.36,.07,.19,.97) both; }
+        .flash-active { animation: flash 0.5s ease-out; }
+
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+            z-index: 100;
+        }
+
+        header {
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        .stats-top { display: flex; gap: 2rem; }
+        .stat-box { display: flex; flex-direction: column; align-items: center; }
+        .stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.2rem; font-weight: bold; }
+
+        main { display: flex; flex: 1; overflow: hidden; }
+
+        #roll-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        #roll-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 3rem;
+            min-height: 350px;
+            justify-content: center;
+        }
+
+        #rolled-image {
+            width: 200px; height: 200px;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(255,255,255,0.1));
+            transition: all 0.3s;
+        }
+
+        #rolled-name {
+            font-size: 3rem; font-weight: 900; margin-top: 1rem;
+            text-align: center; text-transform: uppercase; letter-spacing: 2px;
+        }
+
+        #rolled-odds { font-size: 1.2rem; color: var(--text-muted); margin-top: 0.5rem; }
+
+        .controls { display: flex; flex-direction: column; align-items: center; gap: 1rem; width: 100%; max-width: 400px; }
+
+        button.btn-roll {
+            background: var(--accent); color: white; border: none;
+            padding: 1.2rem 3rem; font-size: 1.5rem; font-weight: bold;
+            border-radius: 50px; cursor: pointer;
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+            transition: all 0.2s; text-transform: uppercase; letter-spacing: 2px; width: 100%;
+        }
+
+        button.btn-roll:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 15px 25px rgba(99, 102, 241, 0.5); }
+        button.btn-roll:active:not(:disabled) { transform: translateY(2px); }
+        button.btn-roll:disabled { background: #333; color: #888; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        .toggles { display: flex; gap: 1.5rem; align-items: center; }
+        .toggle-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; color: var(--text-muted); transition: color 0.2s; }
+        .toggle-label:hover { color: white; }
+        .toggle-label input:disabled { cursor: not-allowed; }
+
+        .btn-upgrade {
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            color: white; padding: 0.8rem 1.5rem; border-radius: 8px; cursor: pointer;
+            transition: all 0.2s; font-family: inherit;
+        }
+        .btn-upgrade:hover { background: rgba(255,255,255,0.1); }
+
+        #inventory-section { width: 450px; background: rgba(0,0,0,0.4); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .inv-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+        .progress-bar-bg { width: 100%; height: 10px; background: var(--panel-bg); border-radius: 5px; margin-top: 0.5rem; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.5s ease-out; }
+        .inv-grid { flex: 1; padding: 1.5rem; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 1rem; align-content: start; }
+        .inv-grid::-webkit-scrollbar { width: 8px; }
+        .inv-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        .inv-grid::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        .inv-item {
+            aspect-ratio: 1; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            position: relative; cursor: pointer; transition: transform 0.2s;
+        }
+        .inv-item:hover { transform: scale(1.05); z-index: 2; }
+        .inv-item img { width: 50%; height: 50%; object-fit: contain; }
+        .inv-item.locked { filter: grayscale(100%) opacity(0.3); }
+        .inv-item.locked img { display: none; }
+        .inv-item.locked::after { content: '???'; font-size: 1.5rem; font-weight: bold; }
+        .item-count { position: absolute; bottom: -5px; right: -5px; background: var(--accent); color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+
+        #global-announcement {
+            position: absolute; top: -100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8);
+            border: 2px solid; padding: 1rem 3rem; border-radius: 50px; font-size: 1.2rem; font-weight: bold;
+            z-index: 1000; transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(10px); text-align: center; white-space: nowrap;
+        }
+        #global-announcement.show { top: 20px; }
+
+        @media (max-width: 900px) {
+            main { flex-direction: column; }
+            #inventory-section { width: 100%; border-left: none; border-top: 1px solid var(--border-color); flex: 1; }
+            #roll-section { padding: 1rem; flex: none; height: 50vh; }
+            #roll-display { min-height: 250px; margin-bottom: 1rem; }
+            #rolled-image { width: 120px; height: 120px; }
+            #rolled-name { font-size: 1.8rem; }
+        }
+
+        .efx-1 { text-shadow: none; }
+        .efx-2 { text-shadow: 0 0 10px currentColor; }
+        .efx-3 { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor; animation: float 3s ease-in-out infinite; }
+        .efx-4 { text-shadow: 0 0 10px #fff, 0 0 30px currentColor, 0 0 50px currentColor; animation: float 2s ease-in-out infinite; }
+        .efx-5 {
+            background-image: linear-gradient(90deg, #fff, currentColor, #fff, currentColor); background-size: 300% 100%;
+            -webkit-background-clip: text; color: transparent; animation: gradientShift 2s linear infinite, float 1.5s ease-in-out infinite;
+            text-shadow: 0 0 50px currentColor;
+        }
+        .efx-6 {
+            background-image: linear-gradient(90deg, #fff, currentColor, #fff, currentColor); background-size: 300% 100%;
+            -webkit-background-clip: text; color: transparent;
+            animation: gradientShift 2s linear infinite, float 1.5s ease-in-out infinite, rainbowShift 4s linear infinite;
+            text-shadow: 0 0 80px currentColor;
+        }
+        .efx-7 {
+            color: #fff; text-shadow: 0 0 15px currentColor, 0 0 40px currentColor, 0 0 80px #fff, 0 0 120px currentColor;
+            letter-spacing: 5px; animation: float 1s ease-in-out infinite, godShake 0.2s infinite, rainbowShift 2s linear infinite;
+        }
+
+        .tooltip {
+            position: absolute; background: rgba(0,0,0,0.9); border: 1px solid var(--border-color); padding: 0.5rem 1rem;
+            border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 500; font-size: 0.9rem; white-space: nowrap;
+        }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background: var(--bg-color); border: 1px solid var(--border-color); padding: 3rem; border-radius: 20px;
+            display: flex; flex-direction: column; align-items: center; position: relative;
+            transform: scale(0.8); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); min-width: 350px;
+        }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .modal-close { position: absolute; top: 15px; right: 20px; background: none; border: none; color: white; font-size: 2rem; cursor: pointer; transition: color 0.2s; }
+        .modal-close:hover { color: var(--accent); }
+        #inspect-image { width: 250px; height: 250px; object-fit: contain; margin-bottom: 1.5rem; filter: drop-shadow(0 0 30px rgba(255,255,255,0.1)); }
+        #inspect-name { font-size: 2.5rem; text-transform: uppercase; font-weight: 900; letter-spacing: 2px; text-align: center; }
+        .inspect-detail { color: var(--text-muted); font-size: 1.1rem; margin-top: 0.5rem; }
+
+        .settings-section { width: 100%; margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .settings-section label { color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .settings-section input {
+            flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: white;
+            padding: 0.8rem; border-radius: 8px; font-family: inherit; outline: none; transition: border-color 0.2s;
+        }
+        .settings-section input:focus { border-color: var(--accent); }
+        .btn-settings-icon { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; transition: color 0.2s, transform 0.2s; }
+        .btn-settings-icon:hover { color: white; transform: rotate(45deg); }
+
+        #cutscene-layer {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000; z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 0.5s ease;
+            pointer-events: all; 
+            overflow: hidden;
+        }
+
+        .cs-star {
+            position: absolute;
+            width: 15px; height: 15px;
+            background-color: #fff;
+            border-radius: 50%;
+            top: 50%; left: -10%;
+            transform: translate(-50%, -50%);
+        }
+
+        .cs-flash {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #fff; opacity: 0; pointer-events: none; z-index: 10;
+        }
+
+        @keyframes csFlashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+        @keyframes streamSlideL {
+            0%   { transform: translateY(-50%) translateX(0); opacity: 1; }
+            100% { transform: translateY(-50%) translateX(100%); opacity: 1; }
+        }
+        @keyframes streamSlideR {
+            0%   { transform: translateY(-50%) translateX(0); opacity: 1; }
+            100% { transform: translateY(-50%) translateX(-100%); opacity: 1; }
+        }
+        @keyframes splitBg {
+            0%   { clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%); }
+            100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+        }
+
+        @keyframes fogFloat {
+            0%   { transform: translateY(0px) scaleX(1);   opacity: 0; }
+            30%  { opacity: 0.55; }
+            100% { transform: translateY(-90px) scaleX(1.1); opacity: 0; }
+        }
+        @keyframes shardFloat {
+            0%   { transform: translateY(0) rotate(0deg);   opacity: 0; }
+            20%  { opacity: 0.85; }
+            100% { transform: translateY(-200px) rotate(var(--shard-rot)); opacity: 0; }
+        }
+
+        @keyframes runeConverge {
+            0%   { opacity: 0; transform: translate(var(--rx), var(--ry)) scale(1.2); }
+            30%  { opacity: 0.9; }
+            100% { opacity: 0;  transform: translate(0px, 0px) scale(0); }
+        }
+
+        @keyframes qSpinIn {
+            0%   { transform: translate(var(--qx), var(--qy)) rotate(0deg)   scale(1.2); opacity: 0.85; }
+            100% { transform: translate(0px, 0px)              rotate(var(--qr)) scale(0);   opacity: 0; }
+        }
+        @keyframes qSpinOut {
+            0%   { transform: translate(0px, 0px) rotate(0deg)   scale(0);   opacity: 0; }
+            100% { transform: translate(var(--qx), var(--qy)) rotate(var(--qr)) scale(1); opacity: 0.8; }
+        }
+
+        .cs-frame {
+            position: absolute;
+            width: 350px; height: 350px;
+            border: 4px solid #fff; border-radius: 20px;
+            display: flex; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.6);
+            opacity: 0; transform: scale(0.5);
+            animation: csFramePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, float 3s ease-in-out infinite alternate;
+            z-index: 20;
+        }
+        .cs-frame img { max-width: 80%; max-height: 80%; object-fit: contain; }
+
+        @keyframes csFramePop { to { opacity: 1; transform: scale(1); } }
+
+        .cs-title {
+            position: absolute;
+            bottom: 12%; width: 100%; text-align: center;
+            font-size: 4rem; font-weight: 900;
+            text-transform: uppercase; letter-spacing: 8px;
+            opacity: 0; transform: translateY(30px);
+            z-index: 20; white-space: nowrap;
+        }
+        @keyframes csTitleUp { to { opacity: 1; transform: translateY(0); } }
+
+        .cs-ray {
+            position: absolute; top: 50%; left: 50%;
+            width: 200vw; height: 20px;
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, currentColor 50%, rgba(255,255,255,0) 100%);
+            transform-origin: center; opacity: 0.15;
+            z-index: 5;
+        }
+        
+                @keyframes fireFlicker {
+            0% { background: radial-gradient(circle at center, rgba(255, 100, 0, 0.3) 0%, rgba(255, 50, 0, 0.1) 40%, transparent 70%); }
+            25% { background: radial-gradient(circle at center, rgba(255, 80, 0, 0.25) 0%, rgba(255, 60, 0, 0.15) 40%, transparent 70%); }
+            50% { background: radial-gradient(circle at center, rgba(255, 120, 0, 0.35) 0%, rgba(255, 70, 0, 0.2) 40%, transparent 70%); }
+            75% { background: radial-gradient(circle at center, rgba(255, 90, 0, 0.28) 0%, rgba(255, 50, 0, 0.12) 40%, transparent 70%); }
+            100% { background: radial-gradient(circle at center, rgba(255, 100, 0, 0.3) 0%, rgba(255, 50, 0, 0.1) 40%, transparent 70%); }
+        }
+        #btn-shop:hover {
+    background: rgba(255,255,255,0.1);
+    transform: scale(1.1);
+}
+.modal-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 6px;
+}
+
+#game-potion-ui {
+    position: fixed;
+    top: 100px;
+    left: 20px;
+    width: 220px;
+    z-index: 3000;
+
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(6px);
+
+    padding: 10px;
+    border-radius: 12px;
+
+    display: none;
+}
+
+.potion-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.potion-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+#game-potion-bar {
+    height: 100%;
+    width: 0%;
+    background: lime;
+}
+
+        #chat-wrapper {
+            position: fixed;
+            top: 0;
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        #chat-tab {
+            pointer-events: all;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            padding: 4px 22px 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            backdrop-filter: blur(8px);
+            transition: color 0.2s, background 0.2s;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #chat-tab:hover { color: #fff; background: rgba(30,30,40,0.85); }
+        #chat-wrapper.dragging #chat-tab { cursor: grabbing; }
+        #chat-tab {
+            cursor: grab;
+        }
+        #chat-tab-arrow {
+            display: inline-block;
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+            font-style: normal;
+        }
+        #chat-wrapper.open #chat-tab-arrow { transform: rotate(180deg); }
+
+        #chat-panel {
+            pointer-events: all;
+            width: 420px;
+            max-width: 96vw;
+            background: rgba(10,10,18,0.92);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 14px 14px;
+            backdrop-filter: blur(14px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+        }
+        #chat-wrapper.open #chat-panel {
+            max-height: 380px;
+            opacity: 1;
+        }
+
+        #chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-height: 260px;
+            max-height: 260px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+        #chat-messages::-webkit-scrollbar { width: 5px; }
+        #chat-messages::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        .chat-msg {
+            font-size: 0.82rem;
+            line-height: 1.45;
+            word-break: break-word;
+            animation: chatMsgIn 0.2s ease-out both;
+        }
+        @keyframes chatMsgIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .chat-msg .chat-user {
+            font-weight: 700;
+            margin-right: 4px;
+        }
+        .chat-msg .chat-text { color: #ccd0e0; }
+        .chat-msg.chat-system { color: #666880; font-style: italic; font-size: 0.76rem; }
+        .chat-msg.chat-self .chat-user { color: var(--accent); }
+        .chat-msg.chat-bot  .chat-user { color: #a0c4ff; }
+
+        .chat-typing-indicator {
+            display: flex; align-items: center; gap: 4px;
+            padding: 2px 0;
+        }
+        .chat-typing-indicator span {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: #555870;
+            animation: typingBounce 1.1s ease-in-out infinite;
+        }
+        .chat-typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+        .chat-typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes typingBounce {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+            40%            { transform: translateY(-5px); opacity: 1; }
+        }
+
+        #chat-input-row {
+            display: flex;
+            gap: 6px;
+            padding: 8px 10px;
+            border-top: 1px solid var(--border-color);
+        }
+        #chat-input {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #fff;
+            padding: 6px 10px;
+            font-family: inherit;
+            font-size: 0.82rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        #chat-input:focus { border-color: var(--accent); }
+        #chat-send {
+            background: var(--accent);
+            border: none; border-radius: 8px;
+            color: #fff; font-size: 0.82rem; font-weight: bold;
+            padding: 6px 14px; cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+        #chat-send:hover { background: var(--accent-hover); }
+        
+</style>
+<body>
+
+    <header>
+        <h2>Simga's RNG</h2>
+        <div class="stats-top">
+            <div class="stat-box">
+                <span class="stat-label">Total Rolls</span>
+                <span class="stat-value" id="stat-total-rolls">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Rolls This Run</span>
+                <span class="stat-value" id="stat-rolls">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Points</span>
+                <span class="stat-value" id="stat-points" style="color: #ffd700;">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Luck Multiplier</span>
+                <span class="stat-value" id="stat-luck">1.0x</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Prestige</span>
+                <span class="stat-value" id="stat-prestige" style="color: #FFD700;">0</span>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button id="btn-prestige" class="btn-upgrade" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; font-weight: bold; border: 2px solid #FFD700;">✨ Prestige</button>
+            <span id="display-player-name" style="font-weight: bold; color: var(--accent);"></span>
+            <button id="btn-settings" class="btn-settings-icon">⚙️</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="roll-section">
+            <div id="roll-display">
+                <img id="rolled-image" src="" alt="" style="display: none;">
+                <div id="rolled-name">Click Roll to Start</div>
+                <div id="rolled-odds"></div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-roll" id="btn-roll">Roll</button>
+                <div class="toggles">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggle-auto"> Auto-Roll (1s)
+                    </label>
+                    <button class="btn-upgrade" id="btn-upgrade">Upgrade Luck (Cost: 100)</button>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 10px;">
+                    Pity Status: <span id="pity-counter">0</span> / 100
+                </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="inventory-section">
+            <div class="inv-header">
+                <h3>Collection</h3>
+                <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
+                    <span>Progress: <span id="progress-text">0/60</span></span>
+                    <span>Highest: <span id="highest-text">None</span></span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progress-bar"></div>
+                </div>
+            </div>
+            <div class="inv-grid" id="inventory-grid"></div>
+        </div>
+    </main>
+
+    <div id="global-announcement"></div>
+    <div id="tooltip" class="tooltip"></div>
+
+    <div id="chat-wrapper">
+        <div id="chat-tab">
+            <span>💬 Global Chat</span>
+            <i id="chat-tab-arrow">▼</i>
+        </div>
+        <div id="chat-panel">
+            <div id="chat-messages"></div>
+            <div id="chat-input-row">
+                <input id="chat-input" type="text" maxlength="200" placeholder="Say something..." autocomplete="off">
+                <button id="chat-send">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="inspect-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" id="btn-close-modal">&times;</button>
+            <img id="inspect-image" src="" alt="">
+            <div id="inspect-name">???</div>
+            <div class="inspect-detail" id="inspect-odds"></div>
+            <div class="inspect-detail" id="inspect-owned"></div>
+            <div class="inspect-detail" id="inspect-value"></div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content" style="width: 400px; align-items: flex-start;">
+            <button class="modal-close" id="btn-close-settings">&times;</button>
+            <h2 style="margin-bottom: 1.5rem; width: 100%; text-align: center;">⚙️ Settings</h2>
+            
+            <div class="settings-section">
+                <label>Player Name</label>
+                <div style="display: flex; gap: 0.5rem; width: 100%;">
+                    <input type="text" id="input-name" maxlength="32" placeholder="Enter new name">
+                    <button id="btn-save-name" class="btn-upgrade">Save</button>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <label>Redeem Code</label>
+                <div style="display: flex; gap: 0.5rem; width: 100%;">
+                    <input type="text" id="input-code" placeholder="Enter code">
+                    <button id="btn-redeem" class="btn-upgrade">Redeem</button>
+                </div>
+                <div id="code-message" style="font-size: 0.85rem; margin-top: 0.2rem;"></div>
+            </div>
+
+            <div class="settings-section" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <button id="btn-reset-progress" style="width: 100%; background: #dc3545; color: white; border: none; padding: 1rem; border-radius: 8px; cursor: pointer; font-weight: bold; font-family: inherit;">Reset Progress</button>
+                <div id="reset-confirm-area" style="display: none; flex-direction: column; gap: 0.5rem;">
+                    <span style="color: #ff6b6b; font-size: 0.9rem; text-align: center;">Are you sure? This deletes everything except your name!</span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="btn-confirm-reset" style="flex: 1; background: #dc3545; color: white; border: none; padding: 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold;">Yes, Delete</button>
+                        <button id="btn-cancel-reset" style="flex: 1; background: var(--panel-bg); color: white; border: 1px solid var(--border-color); padding: 0.8rem; border-radius: 4px; cursor: pointer;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="shop-modal" class="modal-overlay">
+        <div class="modal-content" style="width: 420px; align-items: flex-start;">
+            <button class="modal-close" id="btn-close-shop">&times;</button>
+            <h2 style="margin-bottom: 1.5rem; width: 100%; text-align: center;">🛒 Potion Shop</h2>
+
+            <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%; max-height: 40vh; overflow-y: auto;">
+
+                <div class="btn-upgrade" id="buy-minor">
+                    🧪 Minor Luck Potion<br>
+                    <span class="desc">5x Luck for 60s (Cost: 1M)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-normal">
+                    🧪 Luck Potion<br>
+                    <span class="desc">50x Luck for 120s (Cost: 1B)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-major">
+                    🧪 Major Luck Potion<br>
+                    <span class="desc">1K× Luck for 120s (Cost: 1Qa)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-god">
+                    🧪 GOD Potion<br>
+                    <span class="desc">100K× Luck for 30s (Cost: 10Qi)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-eclipse">
+                    🩸 Eclipse Convergence Serum<br>
+                    <span class="desc">Grants <span style="color:#8f0303;">"Eclipsed"</span> and 125K× Luck for 2m (Cost: 10Sx)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-void">
+                    🌌 Void Distortion Elixir<br>
+                    <span class="desc">Grants <span style="color:#8a2be2;">"Voidmark"</span> and 125K× Luck for 2m (Cost: 10Sx)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-chrono">
+                    ⏳ Chrono Fracture Tonic<br>
+                    <span class="desc">Grants <span style="color:#ffd700;">"Chronobind"</span> and 125K× Luck for 2m (Cost: 10Sx)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-potent-eclipse">
+                    🩸 Potent Eclipse Convergence Serum<br>
+                    <span class="desc">Grants <span style="color:#8f0303;">"Eclipsed"</span> and 500K× Luck for 4m (Cost: 1Sp)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-potent-void">
+                    🌌 Potent Void Distortion Elixir<br>
+                    <span class="desc">Grants <span style="color:#8a2be2;">"Voidmark"</span> and 500K× Luck for 4m (Cost: 1Sp)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-potent-chrono">
+                    ⏳ Potent Chrono Fracture Tonic<br>
+                    <span class="desc">Grants <span style="color:#ffd700;">"Chronobind"</span> and 500K× Luck for 4m (Cost: 1Sp)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-eldritch">
+                    💤 Eldritch Sleep Brew<br>
+                    <span class="desc">Grants <span style="color:#0235b5;">"Dead Sleep"</span> and 5M× Luck for 4m (Cost: 10Sp)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-virtue">
+                    🕊️ Elixir of Vitrues<br>
+                    <span class="desc">Grants <span style="color:#ffee8b;">"Good Samaritan"</span> and 10M× Luck for 3m (Cost: 100Sp)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-sin">
+                    👁️ Tonic of Sins<br>
+                    <span class="desc">Grants <span style="color:#d52b00;">"Misanthropic Mind"</span> and 10M× Luck for 3m (Cost: 100Sp)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-mortal">
+                    👤 Mortal Blood<br>
+                    <span class="desc">Grants <span style="color:#D8BFAA;">"Mortality"</span> and 100M× Luck for 2m (Cost: 1Oc)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-grief">
+                    🖤 Elixir of the Grieved<br>
+                    <span class="desc">Grants <span style="color:#A29FA5;">"Grief"</span> and 1B× Luck for 4m (Cost: 10Oc)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-growth">
+                    🧠 Tonic for the Mind<br>
+                    <span class="desc">Grants <span style="color:#4CAF50;">"Growth Mindset"</span> and 100B× Luck for 3m (Cost: 200Oc)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-question">
+                    🌀 Interrogation Serum<br>
+                    <span class="desc">Grants <span style="color:#5D4EFA;">"The Question"</span> and 10T× Luck for 2m (Cost: 1No)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-unknown">
+                    ❓ Liquid of ???<br>
+                    <span class="desc">Grants <span style="color:#ffffff;">"???"</span> and 100T× Luck for 4m (Cost: 100No)</span>
+                </div>
+
+                <div class="btn-upgrade" id="buy-he-knows" style="display:none; border: 1px solid #aab4ff55; box-shadow: 0 0 18px #aab4ff33;">
+                    👁️ <span style="color:#e8eaff; font-weight:900;">He Knows</span><br>
+                    <span class="desc">Grants <span style="color:#e8eaff; text-shadow:0 0 8px #aab4ff;">"to know"</span> and 1Qa× Luck for 5m (Cost: 1UnD)</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-muted);">
+                Active Potion: <span id="active-potion">None</span>
+            </div>
+            <div id="potion-timer-container" style="
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 6px;
+    margin-top: 8px;
+    overflow: hidden;
+">
+    <div id="potion-timer-bar" style="
+        height: 100%;
+        width: 0%;
+        background: lime;
+    "></div>
+</div>
+        </div>
+    </div>
+<div id="game-popup" class="modal-overlay">
+    <div class="modal-content" style="width: 400px; text-align: center;">
+        <h3 id="popup-message" style="margin-bottom: 1.5rem;"></h3>
+        <div style="display: flex; gap: 1rem; width: 100%;">
+            <button id="popup-confirm" class="btn-upgrade" style="flex: 1;"></button>
+            <button id="popup-cancel" class="btn-upgrade" style="flex: 1;"></button>
+        </div>
+    </div>
+</div>
+    <button id="btn-shop" style="
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    font-size: 2rem;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    color: white;
+    padding: 0.6rem 1rem;
+    border-radius: 12px;
+    cursor: pointer;
+    z-index: 1500;
+    transition: transform 0.2s, background 0.2s;
+">
+    🛒
+</button>
+<div id="game-potion-ui">
+    <div class="potion-label">
+        <span id="game-active-potion">None</span>
+    </div>
+    <div id="game-status-text" style="font-size:0.7rem; color:#aaa;"></div>
+    <div class="potion-bar-bg">
+        <div id="game-potion-bar"></div>
+    </div>
+</div>
+    <script src="chat.js"></script>
+    <script>
+        const rarities = [
+            { id: 1, name: "Common", img: "common", odds: 2, color: "#A0A0A0", effect: 1, val: 1 },
+            { id: 2, name: "Uncommon", img: "uncommon", odds: 3, color: "#4CAF50", effect: 1, val: 2 },
+            { id: 3, name: "Ordinary", img: "ordinary", odds: 4, color: "#8BC34A", effect: 1, val: 3 },
+            { id: 4, name: "Standard", img: "standard", odds: 6, color: "#009688", effect: 1, val: 4 },
+            { id: 5, name: "Refined", img: "refined", odds: 10, color: "#00BCD4", effect: 1, val: 5 },
+            { id: 6, name: "Rare", img: "rare", odds: 15, color: "#2196F3", effect: 2, val: 10 },
+            { id: 7, name: "Superior", img: "superior", odds: 20, color: "#3F51B5", effect: 2, val: 15 },
+            { id: 8, name: "Elite", img: "elite", odds: 30, color: "#9C27B0", effect: 2, val: 20 },
+            { id: 9, name: "Epic", img: "epic", odds: 50, color: "#673AB7", effect: 2, val: 35 },
+            { id: 10, name: "Masterwork", img: "masterwork", odds: 100, color: "#E91E63", effect: 2, val: 75 },
+            { id: 11, name: "Legendary", img: "legendary", odds: 250, color: "#FF9800", effect: 3, val: 200 },
+            { id: 12, name: "Mythic", img: "mythic", odds: 1e3, color: "#FF5722", effect: 3, val: 800 },
+            { id: 13, name: "Ancient", img: "ancient", odds: 3e3, color: "#F44336", effect: 3, val: 2000 },
+            { id: 14, name: "Arcane", img: "arcane", odds: 5e3, color: "#8d23c2", effect: 3, val: 4000 },
+            { id: 15, name: "Exalted", img: "exalted", odds: 8e3, color: "#FFD700", effect: 3, val: 6000 },
+            { id: 16, name: "Transcendent", img: "transcendent", odds: 1e4, color: "#FFFFE0", effect: 3, val: 8000 },
+            { id: 17, name: "Divine", img: "divine", odds: 2e4, color: "#fff3ad", effect: 4, val: 20000 },
+            { id: 18, name: "Celestial", img: "celestial", odds: 3e4, color: "#f5ff69", effect: 4, val: 80000 },
+            { id: 19, name: "Ethereal", img: "ethereal", odds: 4e4, color: "#E6E6FA", effect: 4, val: 200000 },
+            { id: 20, name: "Ascended", img: "ascended", odds: 7e4, color: "#f2ff91", effect: 4, val: 300000 },
+            { id: 21, name: "Godlike", img: "godlike", odds: 1e5, color: "#FF00FF", effect: 4, val: 400000 },
+            { id: 22, name: "Primordial", img: "primordial", odds: 2e5, color: "#39FF14", effect: 4, val: 1000000 },
+            { id: 23, name: "Omniscient", img: "omniscient", odds: 3e5, color: "#7DF9FF", effect: 4, val: 2000000 },
+            { id: 24, name: "Eternal", img: "eternal", odds: 4e5, color: "#FFDAB9", effect: 4, val: 4000000 },
+            { id: 25, name: "Infinity", img: "infinity", odds: 7e5, color: "#C0C0C0", effect: 4, val: 10000000 },
+            { id: 26, name: "Voidborn", img: "voidborn", odds: 1e6, color: "#9D00FF", effect: 5, val: 20000000 },
+            { id: 27, name: "Cosmic Sovereign", img: "cosmic_sovereign", odds: 2e6, color: "#f5ff69", effect: 5, val: 40000000 },
+            { id: 28, name: "Reality Shaper", img: "reality_shaper", odds: 3e6, color: "#E0115F", effect: 5, val: 100000000 },
+            { id: 29, name: "Timeless Paragon", img: "timeless_paragon", odds: 5e6, color: "#B9F2FF", effect: 5, val: 200000000 },
+            { id: 30, name: "Absolute", img: "absolute", odds: 7e6, color: "#FF0000", effect: 5, val: 400000000 },
+            { id: 31, name: "✦ 𝑂𝑀𝐸𝐺𝐴 ✦", img: "omega", odds: 1e7, color: "#ff0080", effect: 6, val: 1e9 },
+            { id: 32, name: "⟡ 𝐀𝐏𝐄𝐗 𝐒𝐈𝐍𝐆𝐔𝐋𝐀𝐑𝐈𝐓𝐘 ⟡", img: "apex_singularity", odds: 2.5e7, color: "#5797cf", effect: 6, val: 5e9 },
+            { id: 33, name: "𓆩 𝐒𝐎𝐕𝐄𝐑𝐄𝐈𝐆𝐍 𝐏𝐑𝐈𝐌𝐄 𓆪", img: "sovereign_prime", odds: 5e7, color: "#ffff00", effect: 6, val: 2e10 },
+            { id: 34, name: "✧ 𝐇𝐘𝐏𝐄𝐑𝐈𝐎𝐍 ✧", img: "hyperion", odds: 7e7, color: "#ff8c00", effect: 6, val: 8e10 },
+            { id: 35, name: "◈ 𝐙𝐄𝐍𝐈𝐓𝐇 ◈", img: "zenith", odds: 9e7, color: "#00ff00", effect: 6, val: 3e11 },
+            { id: 36, name: "✶ 𝐖𝐎𝐑𝐋𝐃𝐒𝐇𝐀𝐏𝐄𝐑 ✶", img: "worldshaper", odds: 1e8, color: "#ff00ff", effect: 6, val: 1e12 },
+            { id: 37, name: "☾ 𝐎𝐕𝐄𝐑𝐕𝐎𝐈𝐃 ☽", img: "overvoid", odds: 2.5e8, color: "#8a2be2", effect: 6, val: 5e12 },
+            { id: 38, name: "✹ 𝐀𝐏𝐄𝐗 𝐄𝐓𝐄𝐑𝐍𝐀𝐋 ✹", img: "apex_eternal", odds: 5e8, color: "#296191", effect: 6, val: 2e13 },
+            { id: 39, name: "❖ 𝐅𝐈𝐍𝐀𝐋𝐈𝐓𝐘 ❖", img: "finality", odds: 7e8, color: "#dc143c", effect: 6, val: 8e13 },
+            { id: 40, name: "⟢ 𝐒𝐔𝐏𝐑𝐄𝐌𝐄 𝐀𝐁𝐒𝐎𝐋𝐔𝐓𝐄 ⟣", img: "supreme_absolute", odds: 9e8, color: "#ffd700", effect: 6, val: 3e14 },
+            { id: 41, name: "✦ 𝐇𝐄𝐀𝐕𝐄𝐍’𝐒 𝐖𝐑𝐀𝐓𝐇 ✦", img: "heavens_wrath", odds: 1e9, color: "#ffffff", effect: 6, val: 1e15 },
+            { id: 42, name: "⟡ 𝐀𝐒𝐓𝐑𝐀𝐋 𝐃𝐎𝐌𝐈𝐍𝐈𝐎𝐍 ⟡", img: "astral_dominion", odds: 2.5e9, color: "#5c2df7", effect: 6, val: 5e15 },
+            { id: 43, name: "𖤐 𝐎𝐁𝐋𝐈𝐕𝐈𝐎𝐍 𝐂𝐑𝐎𝐖𝐍 𖤐", img: "oblivion_crown", odds: 5e9, color: "#4b0082", effect: 6, val: 2e16 },
+            { id: 44, name: "✧ 𝐂𝐄𝐋𝐄𝐒𝐓𝐈𝐀𝐋 𝐀𝐏𝐄𝐗 ✧", img: "celestial_apex", odds: 7e9, color: "#f5ff69", effect: 6, val: 8e16 },
+            { id: 45, name: "⟢ 𝐈𝐍𝐅𝐈𝐍𝐈𝐓𝐘 𝐄𝐍𝐆𝐈𝐍𝐄 ⟣", img: "infinity_engine", odds: 9e9, color: "#c0c0c0", effect: 6, val: 3e17 },
+            { id: 46, name: "✶ 𝐃𝐈𝐕𝐈𝐍𝐄 𝐂𝐀𝐓𝐀𝐂𝐋𝐘𝐒𝐌 ✶", img: "divine_cataclysm", odds: 1e10, color: "#c46451", effect: 6, val: 1e18 },
+            { id: 47, name: "☩ 𝐎𝐌𝐍𝐈𝐕𝐄𝐑𝐒𝐀𝐋 ☩", img: "omniversal", odds: 2.5e10, color: "#f5f5dc", effect: 6, val: 5e18 },
+            { id: 48, name: "❂ 𝐂𝐑𝐄𝐀𝐓𝐈𝐎𝐍’𝐒 𝐄𝐃𝐆𝐄 ❂", img: "creations_edge", odds: 5e10, color: "#e3e374", effect: 6, val: 2e19 },
+            { id: 49, name: "✦ 𝐆𝐎𝐃𝐇𝐀𝐍𝐃 ✦", img: "godhand", odds: 7e10, color: "#daa520", effect: 6, val: 8e19 },
+            { id: 50, name: "⟡ 𝐓𝐑𝐔𝐄 𝐎𝐑𝐈𝐆𝐈𝐍 ⟡", img: "true_origin", odds: 9e10, color: "#f0e68c", effect: 6, val: 2e20 },
+            { id: 51, name: "☠ 𝐔𝐍𝐅𝐀𝐓𝐇𝐎𝐌𝐀𝐁𝐋𝐄 ☠", img: "unfathomable", odds: 1e11, color: "#8B0000", effect: 7, val: 1e21 },
+            { id: 52, name: "✶ 𝐏𝐀𝐑𝐀𝐃𝐎𝐗𝐈𝐂𝐀𝐋 ✶", img: "paradoxical", odds: 2.5e11, color: "#a37903", effect: 7, val: 2e21 },
+            { id: 53, name: "⟢ 𝐁𝐄𝐘𝐎𝐍𝐃 𝐂𝐎𝐌𝐏𝐑𝐄𝐇𝐄𝐍𝐒𝐈𝐎𝐍 ⟣", img: "beyond_comprehension", odds: 5e11, color: "#9de1fc", effect: 7, val: 3e21 },
+            { id: 54, name: "𓆩 𝐓𝐑𝐀𝐍𝐒𝐂𝐄𝐍𝐃𝐄𝐍𝐓 𝐎𝐌𝐄𝐆𝐀 𓆪", img: "transcendent_omega", odds: 7e11, color: "#9b7cf7", effect: 7, val: 3.5e21 },
+            { id: 55, name: "✦ 𝐋𝐈𝐌𝐈𝐓𝐁𝐑𝐄𝐀𝐊𝐄𝐑 ✦", img: "limitbreaker", odds: 1e12, color: "#394ae3", effect: 7, val: 4e21 },
+            { id: 56, name: "◈ 𝐑𝐄𝐀𝐋𝐈𝐓𝐘 𝐂𝐎𝐋𝐋𝐀𝐏𝐒𝐄 ◈", img: "reality_collapse", odds: 2.5e12, color: "#d9d9d9", effect: 7, val: 4.3e21 },
+            { id: 57, name: "☾ 𝐄𝐓𝐄𝐑𝐍𝐀𝐋 𝐒𝐈𝐍𝐆𝐔𝐋𝐀𝐑𝐈𝐓𝐘 ☽", img: "eternal_singularity", odds: 5e12, color: "#dededc", effect: 7, val: 4.6e21 },
+            { id: 58, name: "✹ 𝐀𝐌𝐀𝐓𝐄𝐑𝐀𝐒𝐔 ✹", img: "amaterasu", odds: 7.5e12, color: "#f2a407", effect: 7, val: 4.8e21 },
+            { id: 59, name: "⟡ 𝐓𝐇𝐄 𝐅𝐈𝐑𝐒𝐓 ⟡", img: "the_first", odds: 1e13, color: "#020fa1", effect: 7, val: 1e23 },
+            { id: 60, name: "✦ 𝐓𝐇𝐄 𝐋𝐀𝐒𝐓 ✦", img: "the_last", odds: 1e14, color: "#9e0303", effect: 7, val: 1e25 },
+            { id: 61, name: "☾ 𝐁𝐋𝐎𝐎𝐃 𝐀𝐒𝐂𝐄𝐍𝐃𝐀𝐍𝐓 ☽", img: "blood_ascendant", odds: 1e13, color: "#9e0303", effect: 7, val: 1e24, requiredStatus: "eclipsed"},
+            { id: 62, name: "⟡ 𝐍𝐔𝐋𝐋 𝐒𝐎𝐕𝐄𝐑𝐄𝐈𝐆𝐍 ⟡", img: "null_sovereign", odds: 1e13, color: "#430073", effect: 7, val: 1e24, requiredStatus: "voidmark"},
+            { id: 63, name: "⌛ 𝐓𝐈𝐌𝐄 𝐑𝐄𝐕𝐄𝐍𝐀𝐍𝐓 ⌛", img: "time_revenant", odds: 1e13, color: "#fadb43", effect: 7, val: 1e24, requiredStatus: "chronobind"},
+            { id: 64, name: "☠ 𝐂𝐑𝐈𝐌𝐒𝐎𝐍 𝐏𝐀𝐑𝐀𝐃𝐎𝐗 ☠", img: "crimson_paradox", odds: 1e14, color: "#8f0303", effect: 7, val: 1e25, requiredStatus: "eclipsed"},
+            { id: 65, name: "⟡ 𝐎𝐁𝐋𝐈𝐓𝐄𝐑𝐀𝐓𝐄𝐃 𝐕𝐎𝐈𝐃 ⟡", img: "obliterated_void", odds: 1e14, color: "#6e99ff", effect: 7, val: 1e25, requiredStatus: "voidmark"},
+            { id: 66, name: "⟢ 𝐃𝐄𝐒𝐓𝐈𝐍𝐄𝐃 𝐏𝐀𝐑𝐀𝐆𝐎𝐍 ⟣", img: "destined_paragon", odds: 1e14, color: "#e3e156", effect: 7, val: 1e25, requiredStatus: "chronobind"},
+            { id: 67, name: "🩸𝐍𝐄𝐕𝐄𝐑-𝐄𝐍𝐃𝐈𝐍𝐆 𝐄𝐂𝐋𝐈𝐏𝐒𝐄🩸", img: "never-ending_eclipse", odds: 1e15, color: "#8f0303", effect: 7, val: 1e26, requiredStatus: "eclipsed"},
+            { id: 68, name: "◈ 𝐓𝐇𝐄 𝐕𝐎𝐈𝐃 𝐖𝐈𝐓𝐇𝐈𝐍 ◈", img: "the_void_within", odds: 1e15, color: "#25015c", effect: 7, val: 1e26, requiredStatus: "voidmark"},
+            { id: 69, name: "✦ 𝐓𝐇𝐄 𝐈𝐍𝐄𝐕𝐈𝐓𝐀𝐁𝐋𝐄 ✦", img: "the_inevitable", odds: 1e15, color: "#e3e156", effect: 7, val: 1e26, requiredStatus: "chronobind"},
+            { id: 70, name: "【 𓆩 𝐍𝐘𝐀𝐑𝐋𝐀𝐓𝐇𝐎𝐓𝐄𝐏 𓆪】", img: "nyarlathotep", odds: 1e15, color: "#E6A6EE", effect: 7, val: 1e26, requiredStatus: "dead sleep"},
+            { id: 71, name: "【𖤐 𝐘𝐎𝐆-𝐒𝐎𝐓𝐇𝐎𝐓𝐇 𖤐】", img: "yog-sothoth", odds: 5e15, color: "#4F48AC", effect: 7, val: 5e26, requiredStatus: "dead sleep"},
+            { id: 72, name: "【⟡✦ 𝐀 𝐙 𝐀 𝐓 𝐇 𝐎 𝐓 𝐇 ✦⟡】", img: "azathoth", odds: 1e16, color: "#ffffff", effect: 7, val: 1e27, requiredStatus: "dead sleep"},
+            { id: 73, name: "【 ✦ 𝐏𝐔𝐃𝐈𝐂𝐈𝐓𝐈𝐀 ✦ 】", img: "pudicitia", odds: 1e17, color: "#FBFDDC", effect: 7, val: 5e27, requiredStatus: "good samaritan"},
+            { id: 74, name: "〖 ✧ 𝐅𝐈𝐃𝐄𝐒 ✧ 〗", img: "fides", odds: 1e17, color: "#FEF0B8", effect: 7, val: 5e27, requiredStatus: "good samaritan"},
+            { id: 75, name: "《 ❂ 𝐎𝐏𝐄𝐑𝐀𝐓𝐈𝐎 ❂ 》", img: "operatio", odds: 1e17, color: "#FEF0B8", effect: 7, val: 5e27, requiredStatus: "good samaritan"},
+            { id: 76, name: "〔 ✶ 𝐂𝐎𝐍𝐂𝐎𝐑𝐃𝐈𝐀 ✶ 〕  ", img: "concordia", odds: 1e17, color: "#FBFDDC", effect: 7, val: 5e27, requiredStatus: "good samaritan"},
+            { id: 77, name: "【 ✧ 𝐒𝐎𝐁𝐑𝐈𝐄𝐓𝐀𝐒 ✧ 】", img: "sobrietas", odds: 1e17, color: "#85A2BF", effect: 7, val: 5e27, requiredStatus: "good samaritan"},
+            { id: 78, name: "〖 ✦ 𝐏𝐀𝐓𝐈𝐄𝐍𝐓𝐈𝐀 ✦ 〗", img: "patientia", odds: 1e17, color: "#FBFDDC", effect: 7, val: 5e27, requiredStatus: "good samaritan"},
+            { id: 79, name: "《 ❂ 𝐌𝐄𝐍𝐒 𝐇𝐔𝐌𝐈𝐋𝐈𝐒 ❂ 》", img: "mens_humilis", odds: 1e17, color: "#FEF0B8", effect: 7, val: 5e27, requiredStatus: "good samaritan"},
+            { id: 80, name: "【 ⟁ 𝐒𝐎𝐃𝐎𝐌𝐈𝐓𝐀 𝐋𝐈𝐁𝐈𝐃𝐎 ⟁ 】", img: "sodomita_libido", odds: 1e17, color: "#FF3C43", effect: 7, val: 5e27, requiredStatus: "misanthropic mind"},
+            { id: 81, name: "〖 ⟠ 𝐕𝐄𝐓𝐄𝐑𝐔𝐌 𝐂𝐔𝐋𝐓𝐔𝐑𝐀 𝐃𝐄𝐎𝐑𝐔𝐌 ⟠ 〗", img: "veterum_cultura_deorum", odds: 1e17, color: "#FF3C43", effect: 7, val: 5e27, requiredStatus: "misanthropic mind"},
+            { id: 82, name: "《 ⬡ 𝐀𝐕𝐀𝐑𝐈𝐓𝐈𝐀 ⬡ 》", img: "avaritia", odds: 1e17, color: "#FEF0B8", effect: 7, val: 5e27, requiredStatus: "misanthropic mind"},
+            { id: 83, name: "〔 ⌬ 𝐃𝐈𝐒𝐂𝐎𝐑𝐃𝐈𝐀 ⌬ 〕", img: "discordia", odds: 1e17, color: "#744283", effect: 7, val: 5e27, requiredStatus: "misanthropic mind"},
+            { id: 84, name: "【 ✹ 𝐋𝐔𝐗𝐔𝐑𝐈𝐀 ✹ 】", img: "luxuria", odds: 1e17, color: "#A92C2E", effect: 7, val: 5e27, requiredStatus: "misanthropic mind"},
+            { id: 85, name: "〖 ✺ 𝐈𝐑𝐀 ✺ 〗", img: "ira", odds: 1e17, color: "#A92C2E", effect: 7, val: 5e27, requiredStatus: "misanthropic mind"},
+            { id: 86, name: "《 ⟢ 𝐒𝐔𝐏𝐄𝐑𝐁𝐈𝐀 ⟣ 》", img: "superbia", odds: 1e17, color: "#995479", effect: 7, val: 5e27, requiredStatus: "misanthropic mind"},
+            { id: 87, name: "【 TO LIVE 】", img: "to_live", odds: 1e18, color: "#FDFBDE", effect: 7, val: 1e28, requiredStatus: "mortality"},
+            { id: 88, name: "〖 TO  DIE 〗", img: "to_die", odds: 1e18, color: "#C8CAE9", effect: 7, val: 1e28, requiredStatus: "mortality"},
+            { id: 89, name: "『𝐃 𝐄 𝐍 𝐈 𝐀 𝐋』", img: "denial", odds: 1e19, color: "#FEFFE5", effect: 7, val: 1e29, requiredStatus: "grief"},
+            { id: 90, name: "『𝑨 𝑵 𝑮 𝑬 𝑹』", img: "anger", odds: 1e20, color: "#B38593", effect: 7, val: 1e30, requiredStatus: "grief"},
+            { id: 91, name: "『𝘉 𝘈 𝘙 𝘎 𝘈 𝘐 𝘕 𝘐 𝘕 𝘎』", img: "bargaining", odds: 2.5e20, color: "#FEFFE5", effect: 7, val: 2.5e30, requiredStatus: "grief"},
+            { id: 92, name: "『𝘥 𝘦 𝘱 𝘳 𝘦 𝘴 𝘴 𝘪 𝘰 𝘯』", img: "depression", odds: 5e20, color: "#ffffff", effect: 7, val: 5e30, requiredStatus: "grief"},
+            { id: 93, name: "「𝐀 𝐂 𝐂 𝐄 𝐏 𝐓 𝐀 𝐍 𝐂 𝐄」", img: "acceptance", odds: 1e21, color: "#FEFFE5", effect: 7, val: 1e31, requiredStatus: "grief"},
+            { id: 94, name: "〘 𝑳 𝑬 𝑨 𝑹 𝑵 〙", img: "learn", odds: 1e22, color: "#ffffff", effect: 7, val: 1e31, requiredStatus: "growth mindset"},
+            { id: 95, name: "〈 𝑪 𝑼 𝑹 𝑰 𝑶 𝑺 𝑰 𝑻 𝒀 〉", img: "curiosity", odds: 2.5e22, color: "#ffffff", effect: 7, val: 2.5e32, requiredStatus: "growth mindset"},
+            { id: 96, name: "《 𝑲 𝑵 𝑶 𝑾 𝑳 𝑬 𝑫 𝑮 𝑬 》", img: "knowledge", odds: 5e22, color: "#FBEAA9", effect: 7, val: 5e32, requiredStatus: "growth mindset"},
+            { id: 97, name: "〖 𝑰 𝑵 𝑸 𝑼 𝑰 𝑹 𝑬 〗", img: "inquire", odds: 7.5e22, color: "#FDEB9F", effect: 7, val: 7.5e32, requiredStatus: "growth mindset"},
+            { id: 98, name: "⇒ 𝕊 ℍ 𝔸 𝕃 𝕃  𝑰  𝔸 𝕊 𝕂  ? ⇐", img: "ask", odds: 1e23, color: "#BBC7CE", effect: 7, val: 1e33, requiredStatus: "the question"},
+            { id: 99, name: "⇐ 𝕊 ℍ 𝔸 𝕃 𝕃  𝑰  𝔸 ℕ 𝕊 𝕎 𝔼 ℝ ? ⇒", img: "answer", odds: 1e23, color: "#EAF9FD", effect: 7, val: 1e33, requiredStatus: "the question"},
+            { id: 100, name: "¿⸮? 𝑰  𝔻 𝕆 ℕ ' 𝕋  𝕂 ℕ 𝕆 𝕎 ?⸮¿", img: "unknown", odds: 1e24, colour: "???", effect: 7, val: 1e34, requiredStatus: "???"},
+            { id: 101, name: "『!』ℍ 𝔼  𝕂 ℕ 𝕆 𝕎 𝕊『?』", img: "known", odds: 1e27, colour: "ask him", effect: 7, val: 1e35, requiredStatus: "to know"},
+
+        ];
+        let potionMultiplier = 1;
+        let potionEndTime = 0;
+        let potionInterval = null;
+        let potionTimeout = null;
+        let activePotionName = null;
+        let activeStatusEffect = null;
+        const statusColors = {
+            "voidmark": "#8a2be2",
+            "chronobind": "#ffd700",
+            "eclipsed": "#8f0303",
+            "dead sleep": "#0235b5",
+            "good samaritan": "#ffee8b",
+            "misanthropic mind": "#d52b00",
+            "mortality": "#D8BFAA",
+            "grief": "#A29FA5",
+            "growth mindset": "#4CAF50",
+            "the question": "#5D4EFA",
+            "???": "#ffffff",
+            "to know": "#e8eaff",
+        };
+        let state = { inventory: {}, rolls: 1, points: 1, luckLevel: 1, luck: 1, pity: 0, playerName: null, redeemedCodes: [], prestigeCount: 0, totalRolls: 0, prestigeLuck: 0, heKnowsUnlocked: false };
+        const validCodes = {
+            'RELEASE': 1000,
+            'SIMGAGOGO69': 10000,
+            'WUPDATE': 2000,
+            'CHEATERMEATBEATER': 1e10,
+            'AVISARMPITS': 1e25,
+            'IHATEMAINSTREAMGIRLS': 1e25,
+            'ELDRITCHSLUMBER': 2.5e26,
+            'VIRTUESANDSINS': 2.5e26,
+            'CRUNCHCHOCOLATE': 1e28,
+            'SEATINGPLAN': 1e28,
+            'HUGGILYNIGGA': 3.9e27,
+            'GLOBALCHAT': 1e27,
+            'SECRETWAIFU': 1e27,
+            'FUCKHAMZA': 5e29,
+            'SIMGASCIENCE': 2e28,
+            'ANUSLICKER': 1e29,
+            'SHITTER': 5e28,
+            'SCIENCENIGGERS': 2e30,
+            'BADPRESTIGE': 67
+        };
+        const SAVE_VERSION = 3;
+        let autoRollInterval = null;
+        let isPlayingCutscene = false;
+
+        const popup = document.getElementById("game-popup");
+        const popupMsg = document.getElementById("popup-message");
+        const popupConfirm = document.getElementById("popup-confirm");
+        const popupCancel = document.getElementById("popup-cancel");
+
+        function showPopup(message, confirmText, cancelText, onConfirm) {
+            popupMsg.textContent = message;
+            popupConfirm.textContent = confirmText;
+            popupCancel.textContent = cancelText;
+
+            popup.classList.add("active");
+
+            popupConfirm.onclick = () => {
+                popup.classList.remove("active");
+                onConfirm();
+            };
+
+            popupCancel.onclick = () => {
+                popup.classList.remove("active");
+            };
+        }
+        function formatNumber(num) {
+            if (num < 1000) return Math.floor(num).toString();
+            const map = [
+                { value: 1e36, symbol: "UnD" }, { value: 1e33, symbol: "Dc" }, { value: 1e30, symbol: "No" }, 
+                { value: 1e27, symbol: "Oc" }, { value: 1e24, symbol: "Sp" }, { value: 1e21, symbol: "Sx" }, 
+                { value: 1e18, symbol: "Qi" }, { value: 1e15, symbol: "Qa" }, { value: 1e12, symbol: "T" },
+                { value: 1e9,  symbol: "B" }, { value: 1e6,  symbol: "M" }, { value: 1e3,  symbol: "K" }
+            ];
+            for (let i = 0; i < map.length; i++) {
+                if (num >= map[i].value) {
+                    let formatted = (num / map[i].value).toFixed(1);
+                    if (formatted.endsWith('.0')) formatted = formatted.slice(0, -2);
+                    return formatted + map[i].symbol;
+                }
+            }
+            return Math.floor(num).toString();
+        }
+        
+        const getUpgradeCost = () => 100 * Math.pow(3, state.luckLevel - 3);
+        const getFilename = (rarity) => rarity.img || rarity.name.toLowerCase().replace(/ /g, '_');
+
+        const getPlaceholderSVG = (color, name) => {
+            const initial = name.replace(/[^a-zA-Z]/g, '')[0] || '?';
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                <rect width="100" height="100" fill="#1a1a24" rx="15" stroke="${color}" stroke-width="4"/>
+                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="${color}" font-size="50" font-family="sans-serif" font-weight="bold">${initial.toUpperCase()}</text>
+            </svg>`;
+            return `data:image/svg+xml;base64,${btoa(svg)}`;
+        };
+
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+        let _uiPending = false;
+        let _lastUIResult = null;
+        function scheduleUI(result) {
+            _lastUIResult = result;
+            if (!_uiPending) {
+                _uiPending = true;
+                requestAnimationFrame(() => {
+                    updateUI(_lastUIResult);
+                    animateStandardRoll();
+                    _uiPending = false;
+                });
+            }
+        }
+
+        const DOM = {};
+        function initDOM() {
+            DOM.playerName   = document.getElementById('display-player-name');
+            DOM.totalRolls   = document.getElementById('stat-total-rolls');
+            DOM.rolls        = document.getElementById('stat-rolls');
+            DOM.points       = document.getElementById('stat-points');
+            DOM.luck         = document.getElementById('stat-luck');
+            DOM.prestige     = document.getElementById('stat-prestige');
+            DOM.pity         = document.getElementById('pity-counter');
+            DOM.rolledImage  = document.getElementById('rolled-image');
+            DOM.rolledName   = document.getElementById('rolled-name');
+            DOM.rolledOdds   = document.getElementById('rolled-odds');
+            DOM.btnUpgrade   = document.getElementById('btn-upgrade');
+            DOM.invGrid      = document.getElementById('inventory-grid');
+            DOM.progressText = document.getElementById('progress-text');
+            DOM.progressBar  = document.getElementById('progress-bar');
+            DOM.highestText  = document.getElementById('highest-text');
+        }
+
+        let _savePending = false;
+        function saveData() {
+            state.version = SAVE_VERSION;
+            if (!_savePending) {
+                _savePending = true;
+                setTimeout(() => {
+                    localStorage.setItem('absRngSave', JSON.stringify(state));
+                    _savePending = false;
+                }, 2000);
+            }
+        }
+        function saveDataNow() {
+            state.version = SAVE_VERSION;
+            _savePending = false;
+            localStorage.setItem('absRngSave', JSON.stringify(state));
+        }
+
+        function calculateRNG() {
+            const pityMulti = state.pity >= 100 ? 50 : (1 + (state.pity * 0.02));
+            const currentLuck = (state.luck * potionMultiplier) * pityMulti;
+            
+            const availableRarities = rarities.filter(r => {
+                if (r.requiredStatus) {
+                    return r.requiredStatus === activeStatusEffect;
+                }
+                return true;
+            });
+
+            for (let i = availableRarities.length - 1; i >= 0; i--) {
+                const chance = (1 / availableRarities[i].odds) * currentLuck;
+                if (Math.random() <= chance) return availableRarities[i];
+            }
+            return rarities[0];
+        }
+
+function triggerRoll() {
+    if (isPlayingCutscene) return;
+    
+    const result = calculateRNG();
+    const isNewItem = !state.inventory[result.id] || state.inventory[result.id] === 0;
+
+    state.rolls++;
+    state.totalRolls++;
+    const highestId = Math.max(0, ...Object.keys(state.inventory).map(Number));
+    const badRollThreshold = Math.max(highestId - 5, 7); 
+    if (result.id <= badRollThreshold) { state.pity++; } else { state.pity = 0; }
+    state.points += result.val;
+    state.inventory[result.id] = (state.inventory[result.id] || 0) + 1;
+    saveData();
+
+    if (isNewItem && result.id >= 31) {
+        playCutscene(result);
+    } else {
+        scheduleUI(result);
+        triggerEffects(result, isNewItem); 
+    }
+}
+
+        function animateStandardRoll() {
+            const imgEl = document.getElementById('rolled-image');
+            const nameEl = document.getElementById('rolled-name');
+            imgEl.style.animation = 'none'; nameEl.style.animation = 'none';
+            void imgEl.offsetWidth; 
+            imgEl.style.animation = 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            nameEl.style.animation = 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.1s both';
+        }
+
+        async function playCutscene(rarity) {
+            isPlayingCutscene = true;
+            
+            const autoBtn = document.getElementById('toggle-auto');
+            const wasAutoRolling = autoBtn.checked;
+            if (autoRollInterval) { clearInterval(autoRollInterval); autoRollInterval = null; }
+            document.getElementById('btn-roll').disabled = true;
+            autoBtn.disabled = true;
+
+            const overlay = document.createElement('div');
+            overlay.id = 'cutscene-layer';
+            document.body.appendChild(overlay);
+
+            const tId = rarity.id;
+            const isHolyTier = tId >= 73 && tId <= 79;
+            const isDemonicTier = tId >= 80 && tId <= 86;
+            const isMorality = tId === 87 || tId === 88;
+            const isGriefGroup = tId >= 89 && tId <= 93;
+            const isGrowthGroup = tId >= 94 && tId <= 97;
+            const isQuestionGroup = tId === 98 || tId === 99;
+            const isID100 = tId === 100;
+            const isID101 = tId === 101;
+            const isEpicTier = tId >= 70;
+            const t45 = tId >= 45;
+            const t50 = tId >= 50;
+            const t56 = tId >= 56;
+
+            await sleep(50);
+            overlay.style.opacity = '1';
+            await sleep(600);
+
+            const star = document.createElement('div');
+            star.className = 'cs-star';
+            star.style.boxShadow = `0 0 30px 10px ${rarity.color}`;
+            overlay.appendChild(star);
+
+            let buildupTime = isEpicTier ? 5000 : (t56 ? 3000 : 1800);
+            if (isID101) buildupTime = 8000;
+            let targetX = isEpicTier ? '50%' : (t50 ? '30%' : '50%');
+            
+            star.animate([
+                { left: '-10%', transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                { left: targetX, transform: 'translate(-50%, -50%) scale(1.5)', opacity: 1 }
+            ], { duration: buildupTime, fill: 'forwards', easing: 'ease-in' });
+
+if (isHolyTier) {
+    let trailInterval = setInterval(() => {
+        const starRect = star.getBoundingClientRect();
+        const overlayRect = overlay.getBoundingClientRect();
+        const starScreenX = starRect.left - overlayRect.left + starRect.width / 2;
+        const starScreenY = starRect.top - overlayRect.top + starRect.height / 2;
+        
+        const starPercentX = (starScreenX / overlayRect.width) * 100;
+        
+        const trail = document.createElement('div');
+        trail.style.position = 'absolute';
+        trail.style.left = starPercentX + '%';
+        trail.style.top = '50%';
+        trail.style.width = '20px';
+        trail.style.height = '20px';
+        trail.style.borderRadius = '50%';
+        trail.style.background = 'radial-gradient(circle, #ffee8b 0%, #ffd700 100%)';
+        trail.style.boxShadow = '0 0 20px #ffee8b';
+        trail.style.zIndex = '8';
+        trail.style.opacity = '0.6';
+        overlay.appendChild(trail);
+
+        trail.animate([
+            { transform: 'translate(-50%, -50%) scale(1)', opacity: 0.6 },
+            { transform: 'translate(-50%, -50%) scale(0)', opacity: 0 }
+        ], { duration: 500, easing: 'ease-out' }).onfinish = () => trail.remove();
+    }, 100);
+    
+    setTimeout(() => clearInterval(trailInterval), buildupTime);
+}
+
+if (isDemonicTier) {
+    let fireInterval = setInterval(() => {
+        const starRect = star.getBoundingClientRect();
+        const overlayRect = overlay.getBoundingClientRect();
+        const starScreenX = starRect.left - overlayRect.left + starRect.width / 2;
+        const starScreenY = starRect.top - overlayRect.top + starRect.height / 2;
+        
+        const starPercentX = (starScreenX / overlayRect.width) * 100;
+        
+        const fire = document.createElement('div');
+        fire.style.position = 'absolute';
+        fire.style.left = starPercentX + '%';
+        fire.style.top = '50%';
+        fire.style.width = '25px';
+        fire.style.height = '25px';
+        fire.style.borderRadius = '50%';
+        fire.style.background = 'radial-gradient(circle, #ff3c43 0%, #8f0303 100%)';
+        fire.style.boxShadow = '0 0 25px #ff3c43, inset 0 0 10px #ffaa00';
+        fire.style.zIndex = '8';
+        fire.style.opacity = '0.7';
+        overlay.appendChild(fire);
+
+        fire.animate([
+            { transform: 'translate(-50%, -50%) scale(1) rotate(0deg)', opacity: 0.7 },
+            { transform: 'translate(-50%, -50%) scale(0.3) rotate(180deg)', opacity: 0 }
+        ], { duration: 600, easing: 'ease-out' }).onfinish = () => fire.remove();
+    }, 120);
+    
+    setTimeout(() => clearInterval(fireInterval), buildupTime);
+}
+
+if (isID100) {
+    const questionMarks = ['?', '⸮', '¿'];
+    let qMarkIndex = 0;
+    let qTrailInterval = setInterval(() => {
+        const starRect = star.getBoundingClientRect();
+        const overlayRect = overlay.getBoundingClientRect();
+        const starScreenX = starRect.left - overlayRect.left + starRect.width / 2;
+        const starScreenY = starRect.top - overlayRect.top + starRect.height / 2;
+        
+        const starPercentX = (starScreenX / overlayRect.width) * 100;
+        const starPercentY = (starScreenY / overlayRect.height) * 100;
+        
+        const qMark = document.createElement('div');
+        qMark.style.position = 'absolute';
+        qMark.style.left = starPercentX + '%';
+        qMark.style.top = starPercentY + '%';
+        qMark.style.fontSize = '24px';
+        qMark.style.color = rarity.color;
+        qMark.style.fontWeight = 'bold';
+        qMark.style.zIndex = '8';
+        qMark.style.opacity = '0.7';
+        qMark.textContent = questionMarks[qMarkIndex % 3];
+        qMarkIndex++;
+        overlay.appendChild(qMark);
+
+        qMark.animate([
+            { transform: 'translate(-50%, -50%) scale(1)', opacity: 0.7 },
+            { transform: 'translate(-50%, -50%) scale(0)', opacity: 0 }
+        ], { duration: 500, easing: 'ease-out' }).onfinish = () => qMark.remove();
+    }, 100);
+    
+    setTimeout(() => clearInterval(qTrailInterval), buildupTime);
+    overlay.qTrailInterval = qTrailInterval; 
+}
+
+if (isID101) {
+    const bangQ = ['『!』', '『?』'];
+    let bqIndex = 0;
+    let bqInterval = setInterval(() => {
+        const starRect    = star.getBoundingClientRect();
+        const overlayRect = overlay.getBoundingClientRect();
+        const sx = ((starRect.left - overlayRect.left + starRect.width  / 2) / overlayRect.width)  * 100;
+        const sy = ((starRect.top  - overlayRect.top  + starRect.height / 2) / overlayRect.height) * 100;
+
+        const g = document.createElement('div');
+        g.style.position    = 'absolute';
+        g.style.left        = sx + '%';
+        g.style.top         = sy + '%';
+        g.style.fontSize    = (22 + Math.random() * 18) + 'px';
+        g.style.fontWeight  = '900';
+        g.style.color       = bqIndex % 2 === 0 ? '#ffffff' : '#aab4ff';
+        g.style.textShadow  = `0 0 18px ${bqIndex % 2 === 0 ? '#ffffff' : '#8899ff'}`;
+        g.style.zIndex      = '8';
+        g.style.opacity     = '0.9';
+        g.style.pointerEvents = 'none';
+        g.textContent       = bangQ[bqIndex % 2];
+        bqIndex++;
+        overlay.appendChild(g);
+
+        g.animate([
+            { transform: 'translate(-50%,-50%) scale(1.2)', opacity: 0.9 },
+            { transform: 'translate(-50%,-50%) scale(0)',   opacity: 0   }
+        ], { duration: 700, easing: 'ease-out' }).onfinish = () => g.remove();
+    }, 80);
+
+    setTimeout(() => clearInterval(bqInterval), buildupTime);
+    overlay.bqInterval = bqInterval;
+}
+
+            await sleep(buildupTime);
+
+            if (isID101) {
+                const C1 = '#e8eaff';  
+                const C2 = '#aab4ff'; 
+                const C3 = '#ffffff';   
+
+                if (overlay.bqInterval) clearInterval(overlay.bqInterval);
+
+                star.animate([
+                    { transform: 'translate(-50%,-50%) scale(1.5)',  opacity: 1,   filter: 'blur(0px)' },
+                    { transform: 'translate(-50%,-50%) scale(4)',    opacity: 0.6, filter: 'blur(2px)'  },
+                    { transform: 'translate(-50%,-50%) scale(0)',    opacity: 0,   filter: 'blur(8px)'  }
+                ], { duration: 900, fill: 'forwards', easing: 'cubic-bezier(0.6,0,1,1)' });
+                await sleep(600);
+                flashScreen(overlay);
+                await sleep(300);
+                star.remove();
+
+                overlay.style.background = '#000000';
+                await sleep(700);
+
+                const eyeAura = document.createElement('div');
+                eyeAura.style.cssText = `
+                    position:absolute;left:50%;top:50%;
+                    width:500px;height:240px;
+                    transform:translate(-50%,-50%);
+                    border-radius:50%;
+                    background:radial-gradient(ellipse, ${C2}18 0%, transparent 70%);
+                    box-shadow:0 0 120px 40px ${C2}22;
+                    z-index:14;pointer-events:none;opacity:0;
+                `;
+                overlay.appendChild(eyeAura);
+                eyeAura.animate([{opacity:0},{opacity:1}], {duration:600, fill:'forwards'});
+
+                const eyeWrap = document.createElement('div');
+                eyeWrap.style.cssText = `
+                    position:absolute;left:50%;top:50%;
+                    width:340px;height:148px;
+                    transform:translate(-50%,-50%);
+                    border-radius:50%;
+                    overflow:hidden;
+                    z-index:22;
+                    box-shadow:0 0 80px ${C1}, 0 0 160px ${C2};
+                    border:1px solid ${C1}88;
+                `;
+                overlay.appendChild(eyeWrap);
+
+                const sclera = document.createElement('div');
+                sclera.style.cssText = `
+                    position:absolute;top:0;left:0;width:100%;height:100%;
+                    background:radial-gradient(ellipse at center, #d8deff 0%, #b0b8f8 50%, #8090d8 100%);
+                `;
+                eyeWrap.appendChild(sclera);
+
+                const iris = document.createElement('div');
+                iris.style.cssText = `
+                    position:absolute;left:50%;top:50%;
+                    width:110px;height:110px;
+                    transform:translate(-50%,-50%) scale(0);
+                    border-radius:50%;
+                    background:radial-gradient(circle, #ffffff 0%, ${C2} 25%, #4455cc 55%, #111033 80%, #000 100%);
+                    box-shadow:0 0 30px ${C2}, 0 0 60px ${C1};
+                `;
+                eyeWrap.appendChild(iris);
+
+                const pupil = document.createElement('div');
+                pupil.style.cssText = `
+                    position:absolute;left:50%;top:50%;
+                    width:44px;height:44px;
+                    transform:translate(-50%,-50%);
+                    border-radius:50%;
+                    background:radial-gradient(circle, #000011 0%, #000 100%);
+                    box-shadow:0 0 20px #000033;
+                `;
+                iris.appendChild(pupil);
+
+                const flare = document.createElement('div');
+                flare.style.cssText = `
+                    position:absolute;left:30%;top:20%;
+                    width:20px;height:20px;border-radius:50%;
+                    background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, transparent 70%);
+                    pointer-events:none;
+                `;
+                iris.appendChild(flare);
+
+                const lidT = document.createElement('div');
+                lidT.style.cssText = `
+                    position:absolute;top:0;left:0;
+                    width:100%;height:50%;
+                    background:#000;z-index:5;
+                    transform-origin:top center;
+                `;
+                eyeWrap.appendChild(lidT);
+
+                const lidB = document.createElement('div');
+                lidB.style.cssText = `
+                    position:absolute;bottom:0;left:0;
+                    width:100%;height:50%;
+                    background:#000;z-index:5;
+                    transform-origin:bottom center;
+                `;
+                eyeWrap.appendChild(lidB);
+
+                const vig = document.createElement('div');
+                vig.style.cssText = `
+                    position:absolute;top:0;left:0;width:100%;height:100%;
+                    background:radial-gradient(ellipse at center, transparent 0%, transparent 25%, rgba(0,0,10,0.7) 65%, #000014 100%);
+                    z-index:21;pointer-events:none;
+                `;
+                overlay.appendChild(vig);
+
+                await sleep(300);
+                iris.animate([
+                    {transform:'translate(-50%,-50%) scale(0)'},
+                    {transform:'translate(-50%,-50%) scale(1.08)'},
+                    {transform:'translate(-50%,-50%) scale(1)'}
+                ], {duration:2800, fill:'forwards', easing:'cubic-bezier(0.2,0,0.15,1)', delay:400});
+                lidT.animate([{transform:'scaleY(1)'},{transform:'scaleY(0)'}],
+                    {duration:2800, fill:'forwards', easing:'cubic-bezier(0.15,0,0.2,1)', delay:200});
+                lidB.animate([{transform:'scaleY(1)'},{transform:'scaleY(0)'}],
+                    {duration:2800, fill:'forwards', easing:'cubic-bezier(0.15,0,0.2,1)', delay:200});
+
+                await sleep(3100);
+
+                pupil.animate([
+                    {width:'44px',height:'44px'},
+                    {width:'14px',height:'14px'}
+                ], {duration:400, fill:'forwards', easing:'ease-in'});
+
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        const ring = document.createElement('div');
+                        ring.style.cssText = `
+                            position:absolute;left:50%;top:50%;
+                            width:340px;height:148px;
+                            transform:translate(-50%,-50%);
+                            border-radius:50%;
+                            border:2px solid ${i%2===0 ? C1 : C2};
+                            box-shadow:0 0 12px ${C2};
+                            z-index:23;pointer-events:none;
+                        `;
+                        overlay.appendChild(ring);
+                        ring.animate([
+                            {transform:'translate(-50%,-50%) scale(1)', opacity:0.7},
+                            {transform:'translate(-50%,-50%) scale(3.5)', opacity:0}
+                        ], {duration:2200, easing:'ease-out'}).onfinish = () => ring.remove();
+                    }, i * 380);
+                }
+
+                let irisAngle = 0;
+                const irisRotIv = setInterval(() => {
+                    irisAngle = (irisAngle + 0.12) % 360;
+                    iris.style.transform = `translate(-50%,-50%) rotate(${irisAngle}deg)`;
+                }, 16);
+
+                await sleep(2200);
+
+                const bangEl = document.createElement('div');
+                bangEl.style.cssText = `
+                    position:absolute;top:50%;left:-22%;
+                    font-size:clamp(60px,9vw,110px);font-weight:900;
+                    color:${C3};text-shadow:0 0 40px ${C3},0 0 80px ${C2};
+                    transform:translateY(-50%);z-index:30;
+                    white-space:nowrap;pointer-events:none;
+                `;
+                bangEl.textContent = '『!』';
+                overlay.appendChild(bangEl);
+
+                const questEl = document.createElement('div');
+                questEl.style.cssText = `
+                    position:absolute;top:50%;right:-22%;
+                    font-size:clamp(60px,9vw,110px);font-weight:900;
+                    color:${C3};text-shadow:0 0 40px ${C3},0 0 80px ${C2};
+                    transform:translateY(-50%);z-index:30;
+                    white-space:nowrap;pointer-events:none;
+                `;
+                questEl.textContent = '『?』';
+                overlay.appendChild(questEl);
+
+                bangEl.animate([{left:'-22%'},{left:'12%'}],  {duration:500, fill:'forwards', easing:'cubic-bezier(0.2,0,0.1,1)'});
+                questEl.animate([{right:'-22%'},{right:'12%'}], {duration:500, fill:'forwards', easing:'cubic-bezier(0.2,0,0.1,1)'});
+                await sleep(500);
+                flashScreen(overlay); await sleep(300);
+                flashScreen(overlay); await sleep(300);
+                bangEl.remove(); questEl.remove();
+
+                for (let i = 0; i < 4; i++) { flashScreen(overlay); await sleep(130); }
+                clearInterval(irisRotIv);
+
+                for (let i = 0; i < 60; i++) {
+                    const sh = document.createElement('div');
+                    const isIrisShard = Math.random() > 0.45;
+                    sh.style.cssText = `
+                        position:absolute;left:50%;top:50%;
+                        width:${Math.random()*55+8}px;height:${Math.random()*7+2}px;
+                        background:${isIrisShard ? C2 : C1};
+                        box-shadow:0 0 ${isIrisShard?22:10}px ${isIrisShard?C2:C3};
+                        border-radius:${Math.random()>0.5?2:Math.floor(Math.random()*6)}px;
+                        z-index:33;pointer-events:none;
+                    `;
+                    overlay.appendChild(sh);
+                    const ang = Math.random()*Math.PI*2;
+                    const dist = 180+Math.random()*700;
+                    const rot  = Math.random()*900-450;
+                    sh.animate([
+                        {transform:`translate(-50%,-50%) rotate(0deg) scale(1)`, opacity:1},
+                        {transform:`translate(calc(-50% + ${Math.cos(ang)*dist}px), calc(-50% + ${Math.sin(ang)*dist}px)) rotate(${rot}deg) scale(0.2)`, opacity:0}
+                    ], {duration:1100+Math.random()*900, easing:'cubic-bezier(0.1,0.8,0.2,1)'}).onfinish = () => sh.remove();
+                }
+                eyeWrap.remove(); eyeAura.remove(); vig.remove();
+                overlay.style.background = '#000';
+                await sleep(900);
+
+                const letters = ['H','E',' ','K','N','O','W','S'];
+                const letWrap = document.createElement('div');
+                letWrap.style.cssText = `
+                    position:absolute;left:50%;top:40%;
+                    transform:translate(-50%,-50%);
+                    display:flex;align-items:center;justify-content:center;
+                    gap:0.08em;z-index:35;pointer-events:none;
+                    font-size:clamp(40px,8.5vw,108px);
+                    font-weight:900;letter-spacing:0.05em;
+                `;
+                overlay.appendChild(letWrap);
+
+                for (let i = 0; i < letters.length; i++) {
+                    const ch = letters[i];
+                    if (ch === ' ') {
+                        await sleep(180);
+                        const sp = document.createElement('span');
+                        sp.style.cssText = 'display:inline-block;width:0.35em;';
+                        letWrap.appendChild(sp);
+                        continue;
+                    }
+                    await sleep(340);
+                    const span = document.createElement('span');
+                    span.textContent = ch;
+                    span.style.cssText = `
+                        display:inline-block;
+                        color:${C1};
+                        text-shadow:0 0 30px ${C1}, 0 0 70px ${C2}, 0 0 120px ${C2}44;
+                        opacity:0;transform:translateY(-120px) scale(1.8);
+                    `;
+                    letWrap.appendChild(span);
+                    span.animate([
+                        {transform:'translateY(-120px) scale(1.8)', opacity:0},
+                        {transform:'translateY(8px) scale(0.9)',    opacity:1},
+                        {transform:'translateY(0)    scale(1)',     opacity:1}
+                    ], {duration:280, fill:'forwards', easing:'cubic-bezier(0.1,0,0.2,1)'});
+                    flashScreen(overlay);
+
+                    const sw = document.createElement('div');
+                    sw.style.cssText = `
+                        position:absolute;left:50%;top:40%;
+                        width:10px;height:10px;
+                        border:3px solid ${C1};border-radius:50%;
+                        transform:translate(-50%,-50%);
+                        z-index:34;pointer-events:none;opacity:0.9;
+                    `;
+                    overlay.appendChild(sw);
+                    sw.animate([
+                        {width:'10px',height:'10px',opacity:0.9},
+                        {width:'420px',height:'420px',opacity:0}
+                    ], {duration:700,easing:'ease-out'}).onfinish = () => sw.remove();
+
+                    for (let s = 0; s < 8; s++) {
+                        const sk = document.createElement('div');
+                        sk.style.cssText = `
+                            position:absolute;left:50%;top:40%;
+                            width:4px;height:4px;border-radius:50%;
+                            background:${C3};box-shadow:0 0 8px ${C2};
+                            z-index:34;pointer-events:none;
+                        `;
+                        overlay.appendChild(sk);
+                        const sa = Math.random()*Math.PI*2;
+                        const sd = 40+Math.random()*120;
+                        sk.animate([
+                            {transform:'translate(-50%,-50%)', opacity:1},
+                            {transform:`translate(calc(-50% + ${Math.cos(sa)*sd}px),calc(-50% + ${Math.sin(sa)*sd}px))`, opacity:0}
+                        ], {duration:400+Math.random()*300, easing:'ease-out'}).onfinish = () => sk.remove();
+                    }
+                }
+
+                await sleep(1000);
+
+                const rainSymbols = ['『!』','『?』','!','?','⸮','¿','‽','⁇'];
+                const heRainIv = setInterval(() => {
+                    const sym = document.createElement('div');
+                    sym.style.cssText = `
+                        position:absolute;
+                        left:${Math.random()*100}%;top:-70px;
+                        font-size:${Math.random()*48+16}px;font-weight:900;
+                        color:${Math.random()>0.4?C3:C2};
+                        text-shadow:0 0 14px ${C2};
+                        opacity:${0.15+Math.random()*0.55};
+                        z-index:5;pointer-events:none;
+                    `;
+                    sym.textContent = rainSymbols[Math.floor(Math.random()*rainSymbols.length)];
+                    overlay.appendChild(sym);
+                    sym.animate([
+                        {transform:'translateY(0) rotate(0deg)', opacity:parseFloat(sym.style.opacity)},
+                        {transform:`translateY(${window.innerHeight+80}px) rotate(${Math.random()*360-180}deg)`, opacity:0}
+                    ], {duration:2000+Math.random()*2500, easing:'ease-in'}).onfinish = () => sym.remove();
+                }, 55);
+
+                overlay.style.animation  = 'heavyShake 1.8s cubic-bezier(.36,.07,.19,.97)';
+                overlay.style.background = `radial-gradient(circle at center, ${C2}55 0%, #000014 70%)`;
+
+                createCSParticles(overlay, C1, 700);
+                createCSParticles(overlay, C2, 400);
+                createCSParticles(overlay, C3, 200);
+                createCSRays(overlay, C1);
+
+                for (let i = 0; i < 6; i++) setTimeout(() => flashScreen(overlay), i * 180);
+
+                await sleep(2200);
+                letWrap.remove();
+
+                overlay.heRainIv = heRainIv;
+                setTimeout(() => clearInterval(heRainIv), 10000);
+
+            } else if (isID100) {
+                star.animate([
+                    { transform: 'translate(-50%, -50%) scale(1.5)', opacity: 1 },
+                    { transform: 'translate(-50%, -50%) scale(1.2)', opacity: 0 }
+                ], { duration: 3000, fill: 'forwards', easing: 'ease-out' });
+
+                await sleep(3000);
+
+                const questionMarks = ['?', '⸮', '¿'];
+                let rainInterval = setInterval(() => {
+                    const qMark = document.createElement('div');
+                    qMark.style.position = 'absolute';
+                    qMark.style.left = Math.random() * 100 + '%';
+                    qMark.style.top = '-50px';
+                    qMark.style.fontSize = (Math.random() * 40 + 30) + 'px';
+                    qMark.style.color = rarity.color;
+                    qMark.style.opacity = '0.3';
+                    qMark.style.zIndex = '5';
+                    qMark.style.pointerEvents = 'none';
+                    qMark.textContent = questionMarks[Math.floor(Math.random() * questionMarks.length)];
+                    overlay.appendChild(qMark);
+
+                    qMark.animate([
+                        { transform: 'translateY(0) rotate(0deg)', opacity: 0.3 },
+                        { transform: `translateY(${window.innerHeight + 100}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                    ], { duration: 4000 + Math.random() * 2000, easing: 'ease-in' }).onfinish = () => qMark.remove();
+                }, 200);
+
+                const flashSequence = [
+                    { type: 'flash', duration: 500 },
+                    { type: 'question', mark: '?', duration: 600 },
+                    { type: 'flash', duration: 500 },
+                    { type: 'question', mark: '⸮', duration: 600 },
+                    { type: 'flash', duration: 500 },
+                    { type: 'question', mark: '¿', duration: 600 },
+                    { type: 'flash', duration: 700 }
+                ];
+
+                for (let seq of flashSequence) {
+                    if (seq.type === 'flash') {
+                        flashScreen(overlay);
+                    } else {
+                        const qDisplay = document.createElement('div');
+                        qDisplay.style.position = 'absolute';
+                        qDisplay.style.left = '50%';
+                        qDisplay.style.top = '50%';
+                        qDisplay.style.transform = 'translate(-50%, -50%)';
+                        qDisplay.style.fontSize = '200px';
+                        qDisplay.style.color = rarity.color;
+                        qDisplay.style.fontWeight = '900';
+                        qDisplay.style.zIndex = '15';
+                        qDisplay.style.textShadow = `0 0 50px ${rarity.color}`;
+                        qDisplay.textContent = seq.mark;
+                        overlay.appendChild(qDisplay);
+
+                        await sleep(seq.duration);
+                        qDisplay.remove();
+                        continue;
+                    }
+                    await sleep(seq.duration);
+                }
+
+                overlay.style.animation = 'heavyShake 1.5s cubic-bezier(.36,.07,.19,.97)';
+                overlay.style.background = `radial-gradient(circle at center, ${rarity.color}66 0%, #000 80%)`;
+
+                createCSParticles(overlay, rarity.color, 400);
+                createCSRays(overlay, rarity.color);
+
+                await sleep(800);
+
+                let stopRainLater = setTimeout(() => {
+                    clearInterval(rainInterval);
+                }, 6000); 
+
+                overlay.rainInterval = rainInterval;
+                overlay.stopRainTimeout = stopRainLater;
+
+            } else if (isQuestionGroup) {
+
+                const isAsk    = tId === 98;
+                const qPrimary = isAsk ? '#7ec8e3' : '#ffd580';
+                const qAccent  = isAsk ? '#b0e0ff' : '#ffaa33';
+
+                star.animate([{ opacity: 1, transform: 'translate(-50%,-50%) scale(1.5)' },
+                               { opacity: 0, transform: 'translate(-50%,-50%) scale(0.5)' }],
+                    { duration: 500, fill: 'forwards' });
+                await sleep(500);
+                star.remove();
+
+                overlay.style.background = `radial-gradient(circle at center, ${qPrimary}22 0%, #000 80%)`;
+
+                const qGlyphs = ['?','⸮','¿','‽','？','⁇','⁈','⁉'];
+                const vortexEls = [];
+                for (let i = 0; i < 50; i++) {
+                    const el = document.createElement('div');
+                    el.style.position   = 'absolute';
+                    el.style.left       = '50%';
+                    el.style.top        = '50%';
+                    el.style.fontSize   = (Math.random() * 42 + 14) + 'px';
+                    el.style.fontWeight = '900';
+                    el.style.color      = Math.random() > 0.5 ? qPrimary : qAccent;
+                    el.style.textShadow = `0 0 12px ${qPrimary}`;
+                    el.style.zIndex     = '8';
+                    el.style.pointerEvents = 'none';
+                    el.style.willChange = 'transform, opacity';
+                    el.textContent      = qGlyphs[Math.floor(Math.random() * qGlyphs.length)];
+                    overlay.appendChild(el);
+                    vortexEls.push(el);
+
+                    const radius     = 80 + Math.random() * 280;
+                    const startAngle = (i / 50) * 360;
+                    const rad0       = startAngle * Math.PI / 180;
+                    const spinSign   = isAsk ? 1 : -1;
+                    const x0 = Math.cos(rad0) * radius;
+                    const y0 = Math.sin(rad0) * radius;
+
+                    if (isAsk) {
+                        el.animate([
+                            { transform: `translate(calc(${x0}px - 50%), calc(${y0}px - 50%)) rotate(0deg) scale(1.2)`, opacity: 0.9 },
+                            { transform: `translate(-50%, -50%) rotate(720deg) scale(0)`, opacity: 0 }
+                        ], { duration: 2800, easing: 'ease-in', delay: i * 25, fill: 'forwards' });
+                    } else {
+                        el.animate([
+                            { transform: `translate(-50%, -50%) rotate(0deg) scale(0)`, opacity: 0 },
+                            { transform: `translate(calc(${x0}px - 50%), calc(${y0}px - 50%)) rotate(-720deg) scale(1)`, opacity: 0.85 }
+                        ], { duration: 2800, easing: 'ease-out', delay: i * 25, fill: 'forwards' });
+                    }
+                }
+
+                await sleep(1800);
+                flashScreen(overlay); await sleep(400);
+                flashScreen(overlay); await sleep(600);
+
+                createCSParticles(overlay, qPrimary, 250);
+                createCSParticles(overlay, qAccent, 120);
+                createCSRays(overlay, qPrimary);
+                overlay.style.background = `radial-gradient(circle at center, ${rarity.color}55 0%, #000 80%)`;
+                overlay.style.animation  = 'heavyShake 1.5s cubic-bezier(.36,.07,.19,.97)';
+                await sleep(1200);
+                vortexEls.forEach(el => el.remove());
+
+            } else if (isGrowthGroup) {
+
+                star.animate([{ opacity: 1, transform: 'translate(-50%,-50%) scale(1.5)' },
+                               { opacity: 0, transform: 'translate(-50%,-50%) scale(3)' }],
+                    { duration: 600, fill: 'forwards' });
+                await sleep(600);
+                star.remove();
+
+                const runeSymbols = ['α','β','γ','δ','ε','ζ','η','θ','λ','μ','π','σ','Σ','Ω','∞','√','∂','∇','∈','∀','∃','⊕','⊗','✦','◈','⟡','★','◆','▲','⬡','⟢','⟣','𓆩','𓆪','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
+                const runeEls = [];
+                const runeIvs = [];
+
+                for (let i = 0; i < 48; i++) {
+                    const rEl = document.createElement('div');
+                    rEl.style.cssText = `
+                        position:absolute;left:50%;top:50%;
+                        font-size:${(Math.random()*22+10)}px;
+                        font-weight:bold;color:${rarity.color};
+                        text-shadow:0 0 8px ${rarity.color},0 0 20px ${rarity.color};
+                        z-index:8;pointer-events:none;opacity:0;will-change:transform;
+                    `;
+                    rEl.textContent = runeSymbols[Math.floor(Math.random() * runeSymbols.length)];
+                    overlay.appendChild(rEl);
+                    runeEls.push(rEl);
+
+                    const orbitR = 60 + Math.random() * 230;
+                    const speed  = 0.4 + Math.random() * 1.2;
+                    let   ang    = Math.random() * 360;
+
+                    setTimeout(() => {
+                        rEl.style.opacity = '0.85';
+                        const iv = setInterval(() => {
+                            ang = (ang + speed) % 360;
+                            const r = ang * Math.PI / 180;
+                            rEl.style.transform = `translate(calc(${Math.cos(r)*orbitR}px - 50%), calc(${Math.sin(r)*orbitR}px - 50%))`;
+                        }, 16);
+                        runeIvs.push(iv);
+                    }, i * 40);
+                }
+
+                const aura = document.createElement('div');
+                aura.style.cssText = `
+                    position:absolute;left:50%;top:50%;
+                    width:0;height:0;border-radius:50%;
+                    background:radial-gradient(circle, ${rarity.color}88 0%, transparent 70%);
+                    transform:translate(-50%,-50%);
+                    box-shadow:0 0 60px ${rarity.color};
+                    z-index:7;pointer-events:none;
+                `;
+                overlay.appendChild(aura);
+                aura.animate([{width:'0px',height:'0px',opacity:0},{width:'320px',height:'320px',opacity:0.7}],
+                    {duration:2000, fill:'forwards', easing:'ease-in'});
+
+                await sleep(2200);
+                for (let i = 0; i < 2; i++) { flashScreen(overlay); await sleep(250); }
+
+                createCSParticles(overlay, rarity.color, 350);
+                createCSRays(overlay, rarity.color);
+                overlay.style.background = `radial-gradient(circle at center, ${rarity.color}66 0%, #000 80%)`;
+                overlay.style.animation  = 'heavyShake 1.2s cubic-bezier(.36,.07,.19,.97)';
+                await sleep(900);
+
+                runeIvs.forEach(iv => clearInterval(iv));
+                runeEls.forEach(el => el.remove());
+                aura.remove();
+
+            } else if (isGriefGroup) {
+
+                star.animate([{ opacity: 1 }, { opacity: 0 }],
+                    { duration: 900, fill: 'forwards', easing: 'ease-in' });
+                await sleep(900);
+                star.remove();
+
+                const fogEls = [];
+                for (let i = 0; i < 7; i++) {
+                    const fog = document.createElement('div');
+                    const w   = 60 + Math.random() * 90;
+                    const lft = Math.random() * (100 - w);
+                    fog.style.cssText = `
+                        position:absolute;bottom:-10%;left:${lft}%;
+                        width:${w}%;height:${35+Math.random()*30}%;
+                        background:radial-gradient(ellipse at 50% 80%, ${rarity.color}30 0%, transparent 70%);
+                        border-radius:50%;filter:blur(${20+Math.random()*25}px);
+                        z-index:5;pointer-events:none;opacity:0;
+                    `;
+                    overlay.appendChild(fog);
+                    fogEls.push(fog);
+                    fog.animate([
+                        { bottom:'-10%', opacity:0 },
+                        { bottom:`${20+i*8}%`, opacity:0.7 },
+                        { bottom:`${50+i*8}%`, opacity:0 }
+                    ], { duration:3000+i*300, easing:'ease-out', delay:i*200, fill:'forwards' });
+                }
+
+                for (let i = 0; i < 35; i++) {
+                    setTimeout(() => {
+                        const s   = document.createElement('div');
+                        const big = Math.random() > 0.65;
+                        const rot = Math.random() * 360;
+                        s.style.cssText = `
+                            position:absolute;
+                            left:${5+Math.random()*90}%;bottom:-5%;
+                            width:${big?Math.random()*8+4:Math.random()*3+1}px;
+                            height:${big?Math.random()*24+10:Math.random()*6+3}px;
+                            background:${rarity.color};
+                            box-shadow:0 0 ${big?12:6}px ${rarity.color};
+                            border-radius:${big?2:50}%;
+                            z-index:9;pointer-events:none;opacity:0;
+                        `;
+                        overlay.appendChild(s);
+                        s.animate([
+                            { bottom:'-5%', transform:`rotate(0deg)`, opacity:0 },
+                            { bottom:`${25+Math.random()*55}%`, opacity:0.9, transform:`rotate(${rot*0.5}deg)` },
+                            { bottom:`${65+Math.random()*25}%`, opacity:0, transform:`rotate(${rot}deg)` }
+                        ], { duration:2200+Math.random()*1800, easing:'ease-out', fill:'forwards' })
+                         .onfinish = () => s.remove();
+                    }, i * 60);
+                }
+
+                await sleep(2200);
+                flashScreen(overlay);
+                createCSParticles(overlay, rarity.color, 300);
+                createCSRays(overlay, rarity.color);
+                overlay.style.background = `radial-gradient(circle at center, ${rarity.color}44 0%, #000 80%)`;
+                overlay.style.animation  = 'heavyShake 1.2s cubic-bezier(.36,.07,.19,.97)';
+                await sleep(900);
+                fogEls.forEach(el => el.remove());
+
+            } else if (isMorality) {
+
+                const toLive = tId === 87;
+                const clrL   = toLive ? '#ffffff' : '#1c1c2e';
+                const clrR   = toLive ? '#C8CAE9' : '#FDFBDE';
+                const glowL  = toLive ? '#ffffff' : '#6666aa';
+                const glowR  = toLive ? '#aab8ff' : '#ffffcc';
+
+                star.animate([{ opacity:1, transform:'translate(-50%,-50%) scale(1.5)' },
+                               { opacity:0, transform:'translate(-50%,-50%) scale(0.8)' }],
+                    { duration:500, fill:'forwards' });
+                await sleep(500);
+                star.remove();
+
+                const bg2 = document.createElement('div');
+                bg2.style.cssText = `
+                    position:absolute;top:0;left:0;width:100%;height:100%;
+                    background:linear-gradient(90deg, ${toLive?'#050510':'#131300'} 50%, ${toLive?'#131300':'#050510'} 50%);
+                    z-index:4;pointer-events:none;opacity:0;
+                `;
+                overlay.appendChild(bg2);
+                bg2.animate([{opacity:0},{opacity:1}], {duration:350, fill:'forwards'});
+                await sleep(350);
+
+                const div = document.createElement('div');
+                div.style.cssText = `
+                    position:absolute;left:50%;top:0;width:2px;height:100%;
+                    background:linear-gradient(180deg,transparent,#fff 20%,#fff 80%,transparent);
+                    box-shadow:0 0 20px #fff,0 0 40px #fff;
+                    transform:translateX(-50%);z-index:6;pointer-events:none;opacity:0.6;
+                `;
+                overlay.appendChild(div);
+
+                const sL = document.createElement('div');
+                sL.style.cssText = `
+                    position:absolute;top:50%;left:-65%;
+                    width:65%;height:14px;
+                    background:linear-gradient(90deg, transparent 0%, ${clrL} 100%);
+                    box-shadow:0 0 50px ${glowL},0 0 100px ${glowL};
+                    border-radius:0 7px 7px 0;transform:translateY(-50%);z-index:10;
+                `;
+                overlay.appendChild(sL);
+
+                const sR = document.createElement('div');
+                sR.style.cssText = `
+                    position:absolute;top:50%;right:-65%;
+                    width:65%;height:14px;
+                    background:linear-gradient(270deg, transparent 0%, ${clrR} 100%);
+                    box-shadow:0 0 50px ${glowR},0 0 100px ${glowR};
+                    border-radius:7px 0 0 7px;transform:translateY(-50%);z-index:10;
+                `;
+                overlay.appendChild(sR);
+
+                const tivL = setInterval(() => {
+                    const rect = sL.getBoundingClientRect();
+                    const pct  = (rect.right / window.innerWidth) * 100;
+                    const tp   = document.createElement('div');
+                    tp.style.cssText = `position:absolute;left:${pct}%;top:50%;width:10px;height:10px;border-radius:50%;background:${clrL};box-shadow:0 0 15px ${glowL};z-index:9;pointer-events:none;`;
+                    overlay.appendChild(tp);
+                    tp.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:0.8},{transform:'translate(-50%,-50%) scale(0)',opacity:0}],
+                        {duration:400,easing:'ease-out'}).onfinish = () => tp.remove();
+                }, 60);
+                const tivR = setInterval(() => {
+                    const rect = sR.getBoundingClientRect();
+                    const pct  = (rect.left / window.innerWidth) * 100;
+                    const tp   = document.createElement('div');
+                    tp.style.cssText = `position:absolute;left:${pct}%;top:50%;width:10px;height:10px;border-radius:50%;background:${clrR};box-shadow:0 0 15px ${glowR};z-index:9;pointer-events:none;`;
+                    overlay.appendChild(tp);
+                    tp.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:0.8},{transform:'translate(-50%,-50%) scale(0)',opacity:0}],
+                        {duration:400,easing:'ease-out'}).onfinish = () => tp.remove();
+                }, 60);
+
+                sL.animate([{left:'-65%'},{left:'50%'}],  {duration:1800,fill:'forwards',easing:'cubic-bezier(0.4,0,0.8,1)'});
+                sR.animate([{right:'-65%'},{right:'50%'}], {duration:1800,fill:'forwards',easing:'cubic-bezier(0.4,0,0.8,1)'});
+                await sleep(1800);
+                clearInterval(tivL); clearInterval(tivR);
+                sL.remove(); sR.remove(); bg2.remove(); div.remove();
+
+                for (let i = 0; i < 3; i++) { flashScreen(overlay); await sleep(180); }
+
+                for (let i = 0; i < 40; i++) {
+                    const sh   = document.createElement('div');
+                    const pale = Math.random() > 0.5;
+                    sh.style.cssText = `
+                        position:absolute;left:50%;top:50%;
+                        width:${Math.random()*80+10}px;height:${Math.random()*6+2}px;
+                        background:${pale?clrL:clrR};
+                        box-shadow:0 0 18px ${pale?glowL:glowR};
+                        border-radius:2px;z-index:12;pointer-events:none;
+                    `;
+                    overlay.appendChild(sh);
+                    const ang  = Math.random() * Math.PI * 2;
+                    const dist = 150 + Math.random() * 500;
+                    const rot  = Math.random() * 720 - 360;
+                    sh.animate([
+                        {transform:`translate(-50%,-50%) rotate(0deg)`, opacity:1},
+                        {transform:`translate(calc(-50% + ${Math.cos(ang)*dist}px), calc(-50% + ${Math.sin(ang)*dist}px)) rotate(${rot}deg)`, opacity:0}
+                    ], {duration:1000+Math.random()*900, easing:'ease-out'}).onfinish = () => sh.remove();
+                }
+
+                createCSParticles(overlay, clrL, 220);
+                createCSParticles(overlay, clrR, 220);
+                createCSRays(overlay, toLive ? '#ffffff' : '#C8CAE9');
+                overlay.style.background = `radial-gradient(circle at center, ${rarity.color}66 0%, #000 80%)`;
+                overlay.style.animation  = 'heavyShake 1.5s cubic-bezier(.36,.07,.19,.97)';
+                await sleep(1100);
+
+            } else if (isEpicTier) {
+                star.animate([
+                    { transform: 'translate(-50%, -50%) scale(1.5)', opacity: 1 },
+                    { transform: 'translate(-50%, -50%) scale(1.2)', opacity: 0 }
+                ], { duration: 2000, fill: 'forwards', easing: 'ease-out' });
+
+                await sleep(2000);
+
+                for (let i = 0; i < 3; i++) {
+                    flashScreen(overlay);
+                    await sleep(300);
+                }
+
+                createCSParticles(overlay, rarity.color, 400);
+                createCSRays(overlay, rarity.color);
+                
+                overlay.style.animation = 'heavyShake 1.5s cubic-bezier(.36,.07,.19,.97)';
+                overlay.style.background = `radial-gradient(circle at center, ${rarity.color}66 0%, #000 80%)`;
+
+                await sleep(800);
+
+            } else if (t50) {
+                star.animate([
+                    { left: '30%', transform: 'translate(-50%, -50%) scale(1.5)' },
+                    { left: '50%', transform: 'translate(-50%, -50%) scale(2.5)' }
+                ], { duration: 1500, fill: 'forwards', easing: 'linear' });
+
+                await sleep(1000);
+                
+                if (t45) flashScreen(overlay);
+                await sleep(500);
+
+                star.remove();
+                overlay.style.animation = 'heavyShake 1s cubic-bezier(.36,.07,.19,.97)';
+                
+                if (t45) {
+                    overlay.style.background = `radial-gradient(circle at center, ${rarity.color}44 0%, #000 80%)`;
+                }
+
+                createCSParticles(overlay, rarity.color, 250);
+
+                if (t50) {
+                    setTimeout(() => createCSParticles(overlay, '#ffffff', 150), 200);
+                }
+
+                if (t56) {
+                    createCSRays(overlay, rarity.color);
+                }
+
+            } else if (t45) {
+                flashScreen(overlay);
+                star.remove();
+                overlay.style.animation = 'shake 0.5s ease-out';
+                createCSParticles(overlay, rarity.color, 100);
+            } else {
+                star.remove();
+            }
+
+            const frame = document.createElement('div');
+            frame.className = 'cs-frame';
+            frame.style.borderColor = rarity.color;
+            frame.style.boxShadow = `0 0 60px ${rarity.color}, inset 0 0 40px ${rarity.color}`;
+            
+            const img = document.createElement('img');
+            img.src = `images/${getFilename(rarity)}.png`;
+            img.onerror = () => { img.src = getPlaceholderSVG(rarity.color, rarity.name); };
+            frame.appendChild(img);
+            overlay.appendChild(frame);
+            
+if (isHolyTier) {
+    const halo = document.createElement('div');
+    halo.style.position = 'fixed';
+    halo.style.top = '50vh';
+    halo.style.left = '50vw';
+    halo.style.width = '450px';
+    halo.style.height = '450px';
+    halo.style.marginLeft = '-225px';
+    halo.style.marginTop = '-225px';
+    halo.style.border = '3px solid #ffee8b';
+    halo.style.borderRadius = '50%';
+    halo.style.boxShadow = '0 0 40px #ffee8b, inset 0 0 40px rgba(255, 238, 139, 0.3)';
+    halo.style.zIndex = '18';
+    halo.style.opacity = '0.8';
+    halo.style.animation = 'float 4s ease-in-out infinite';
+    halo.style.pointerEvents = 'none';
+    overlay.appendChild(halo);
+}
+
+            if (isDemonicTier) {
+                const fireBackdrop = document.createElement('div');
+                fireBackdrop.style.position = 'absolute';
+                fireBackdrop.style.top = '0';
+                fireBackdrop.style.left = '0';
+                fireBackdrop.style.width = '100%';
+                fireBackdrop.style.height = '100%';
+                fireBackdrop.style.background = 'radial-gradient(circle at center, rgba(255, 60, 67, 0.4) 0%, rgba(143, 3, 3, 0.2) 50%, #000 100%)';
+                fireBackdrop.style.zIndex = '17';
+                fireBackdrop.style.pointerEvents = 'none';
+                overlay.appendChild(fireBackdrop);
+
+                fireBackdrop.style.animation = 'none';
+                const flicker = setInterval(() => {
+                    fireBackdrop.style.opacity = (0.3 + Math.random() * 0.3).toString();
+                }, 150);
+                
+                overlay.fireFlickerInterval = flicker;
+            }
+
+            const title = document.createElement('div');
+            title.className = 'cs-title';
+            title.style.color = rarity.color;
+            title.style.textShadow = `0 0 20px ${rarity.color}, 0 0 50px ${rarity.color}`;
+            overlay.appendChild(title);
+
+            if (isID101) {
+                title.style.color      = '#e8eaff';
+                title.style.textShadow = '0 0 20px #e8eaff, 0 0 60px #aab4ff, 0 0 100px #6677ff44';
+                title.style.opacity    = '1';
+                title.style.transform  = 'translateY(0)';
+                await sleep(600);
+                const chars101 = [...rarity.name];
+                for (let i = 0; i < chars101.length; i++) {
+                    title.textContent += chars101[i];
+                    await sleep(110);
+                }
+                title.style.animation = 'float 2.5s ease-in-out infinite alternate, rainbowShift 5s linear infinite';
+            } else if (isID100) {
+                title.style.opacity = '1';
+                title.style.transform = 'translateY(0)';
+                await sleep(1000);
+                const chars = [...rarity.name];
+                for (let i = 0; i < chars.length; i++) {
+                    title.textContent += chars[i];
+                    await sleep(120);
+                }
+                title.style.animation = 'float 3s ease-in-out infinite alternate, rainbowShift 3s linear infinite';
+            } else if (isEpicTier) {
+                title.style.opacity = '1';
+                title.style.transform = 'translateY(0)';
+                await sleep(1000); 
+                const chars = [...rarity.name];
+                for (let i = 0; i < chars.length; i++) {
+                    title.textContent += chars[i];
+                    await sleep(100);
+                }
+                title.style.animation = 'float 3s ease-in-out infinite alternate, rainbowShift 3s linear infinite';
+            } else if (t56) {
+                title.style.opacity = '1';
+                title.style.transform = 'translateY(0)';
+                await sleep(800); 
+                const chars = [...rarity.name];
+                for (let i = 0; i < chars.length; i++) {
+                    title.textContent += chars[i];
+                    await sleep(80); 
+                }
+                title.style.animation = 'float 3s ease-in-out infinite alternate';
+            } else {
+                title.textContent = rarity.name;
+                title.style.animation = 'csTitleUp 0.6s ease-out forwards, float 3s ease-in-out infinite alternate';
+                title.style.animationDelay = '0s, 0.6s';
+            }
+
+            let admireTime = isID101 ? 9000 : (isID100 ? 6000 : (isEpicTier ? 6000 : (t56 ? 5000 : 3500)));
+            await sleep(admireTime);
+
+            if (isID101 && overlay.heRainIv) {
+                clearInterval(overlay.heRainIv);
+            }
+
+            if (isID100) {
+                if (overlay.rainInterval) clearInterval(overlay.rainInterval);
+                if (overlay.stopRainTimeout) clearTimeout(overlay.stopRainTimeout);
+            }
+
+            if (isDemonicTier && overlay.fireFlickerInterval) {
+                clearInterval(overlay.fireFlickerInterval);
+            }
+
+            overlay.style.opacity = '0';
+            await sleep(600);
+            overlay.remove();
+
+            updateUI(rarity); 
+            
+            isPlayingCutscene = false;
+            document.getElementById('btn-roll').disabled = false;
+            autoBtn.disabled = false;
+            
+            if (wasAutoRolling && autoBtn.checked) {
+                autoRollInterval = setInterval(triggerRoll, 1000);
+            }
+        }
+
+        function flashScreen(parent) {
+            const f = document.createElement('div');
+            f.className = 'cs-flash';
+            f.style.animation = 'csFlashAnim 0.3s ease-out';
+            parent.appendChild(f);
+            setTimeout(() => f.remove(), 300);
+        }
+
+        function createCSParticles(parent, color, count) {
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('div');
+                p.style.position = 'absolute'; p.style.left = '50%'; p.style.top = '50%';
+                const size = Math.random() * 8 + 4;
+                p.style.width = `${size}px`; p.style.height = `${size}px`;
+                p.style.backgroundColor = color; p.style.borderRadius = '50%';
+                p.style.boxShadow = `0 0 15px ${color}`; p.style.zIndex = '10';
+                parent.appendChild(p);
+
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * (window.innerWidth * 0.6) + 100;
+                
+                p.animate([
+                    { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                    { transform: `translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(0)`, opacity: 0 }
+                ], { duration: 1000 + Math.random() * 1500, easing: 'cubic-bezier(0.1, 0.8, 0.3, 1)' }).onfinish = () => p.remove();
+            }
+        }
+
+        function createCSRays(parent, color) {
+            const rays = 12;
+            for(let i=0; i<rays; i++) {
+                const r = document.createElement('div');
+                r.className = 'cs-ray'; r.style.color = color;
+                const angle = (360/rays) * i;
+                parent.appendChild(r);
+                r.animate([
+                    { transform: `translate(-50%, -50%) rotate(${angle}deg)` },
+                    { transform: `translate(-50%, -50%) rotate(${angle + 360}deg)` }
+                ], { duration: 25000, iterations: Infinity });
+            }
+        }
+
+        function triggerEffects(rarity, isNewItem) {
+            if (!isNewItem) return;
+            
+            const body = document.body;
+            body.className = ''; 
+            if (rarity.effect === 3) body.classList.add('shake-active');
+            if (rarity.effect >= 4 && rarity.effect <= 5) {
+                setTimeout(() => body.classList.add('flash-active'), 50);
+                spawnStandardParticles(rarity.color, 30);
+            }
+            if (rarity.effect >= 5) {
+                body.classList.remove('shake-active'); body.classList.add('heavy-shake-active');
+                spawnStandardParticles(rarity.color, 100);
+                showAnnouncement(`YOU ROLLED ${rarity.name.toUpperCase()}!`, rarity.color);
+            }
+            setTimeout(() => { body.className = ''; }, 1000);
+        }
+
+        function spawnStandardParticles(color, count) {
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle'; p.style.backgroundColor = color;
+                const size = Math.random() * 10 + 5; p.style.width = `${size}px`; p.style.height = `${size}px`;
+                p.style.left = '50%'; p.style.top = '50%';
+                document.body.appendChild(p);
+                const angle = Math.random() * Math.PI * 2; const dist = Math.random() * 600 + 100;
+                p.animate([
+                    { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                    { transform: `translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(0)`, opacity: 0 }
+                ], { duration: 800 + Math.random() * 800, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' }).onfinish = () => p.remove();
+            }
+        }
+        function showAnnouncement(text, color) {
+            const banner = document.getElementById('global-announcement');
+            banner.textContent = text;
+            banner.style.borderColor = color;
+            banner.style.color = color;
+            banner.style.boxShadow = `0 0 20px ${color}`;
+            
+            banner.classList.add('show');
+            setTimeout(() => banner.classList.remove('show'), 4000);
+        }
+function buyPotion(type) {
+    let cost, multiplier, duration, name;
+
+    if (type === 1) {
+        cost = 1e6;
+        multiplier = 5;
+        duration = 60000;
+        name = "Minor Luck Potion";
+        statusEffect = null;
+    }
+
+    if (type === 2) {
+        cost = 1e9;
+        multiplier = 50;
+        duration = 120000;
+        name = "Luck Potion";
+        statusEffect = null;
+    }
+
+    if (type === 3) {
+        cost = 1e15;
+        multiplier = 1000;
+        duration = 90000;
+        name = "Major Luck Potion";
+        statusEffect = null;
+    }
+
+    if (type === 4) {
+        cost = 1e19;
+        multiplier = 100000;
+        duration = 60000;
+        name = "God Potion";
+        statusEffect = null;
+    }
+
+    if (type === 5) {
+        cost = 1e22;
+        multiplier = 125000;
+        duration = 120000;
+        name = "Eclipse Convergence Serum";
+        statusEffect = "eclipsed";
+    }
+
+    if (type === 6) {
+        cost = 1e22;
+        multiplier = 125000;
+        duration = 120000;
+        name = "Void Distortion Elixir";
+        statusEffect = "voidmark";
+    }
+
+    if (type === 7) {
+        cost = 1e22;
+        multiplier = 125000;
+        duration = 120000;
+        name = "Chrono Fracture Tonic";
+        statusEffect = "chronobind";
+    }
+
+    if (type === 8) {
+        cost = 1e24;
+        multiplier = 500000;
+        duration = 240000;
+        name = "Potent Eclipse Convergence Serum";
+        statusEffect = "eclipsed";
+    }
+
+    if (type === 9) {
+        cost = 1e24;
+        multiplier = 500000;
+        duration = 240000;
+        name = "Potent Void Distortion Elixir";
+        statusEffect = "voidmark";
+    }
+
+    if (type === 10) {
+        cost = 1e24;
+        multiplier = 500000;
+        duration = 240000;
+        name = "Potent Chrono Fracture Tonic";
+        statusEffect = "chronobind";
+    }
+
+    if (type === 11) {
+        cost = 1e25;
+        multiplier = 5000000;
+        duration = 240000;
+        name = "Eldtritch Sleep Brew";
+        statusEffect = "dead sleep";
+    }
+
+    if (type === 12) {
+        cost = 1e26;
+        multiplier = 10000000;
+        duration = 180000;
+        name = "Elixir of Vitrues";
+        statusEffect = "good samaritan";
+    }
+
+    if (type === 13) {
+        cost = 1e26;
+        multiplier = 10000000;
+        duration = 180000;
+        name = "Tonic of Sins";
+        statusEffect = "misanthropic mind";
+    }
+//checkpoint
+    if (type === 14) {
+        cost = 1e27;
+        multiplier = 100000000;
+        duration = 120000;
+        name = "Mortal Blood";
+        statusEffect = "mortality";
+    }
+
+    if (type === 15) {
+        cost = 1e28;
+        multiplier = 1000000000;
+        duration = 240000;
+        name = "Elixir of the Grieved";
+        statusEffect = "grief";
+    }
+
+    if (type === 16) {
+        cost = 2e29;
+        multiplier = 100000000000;
+        duration = 180000;
+        name = "Tonic for the Mind";
+        statusEffect = "growth mindset";
+    }
+
+    if (type === 17) {
+        cost = 1e30;
+        multiplier = 1000000000000;
+        duration = 120000;
+        name = "Interrogation Serum";
+        statusEffect = "the question";
+    }
+
+    if (type === 18) {
+        cost = 1e32;
+        multiplier = 100000000000000;
+        duration = 240000;
+        name = "Liquid of ???";
+        statusEffect = "???";
+    }
+
+    if (type === 19) {
+        if (!state.heKnowsUnlocked) return;
+        cost = 1e36;
+        multiplier = 1e14;
+        duration = 300000;
+        name = "He Knows";
+        statusEffect = "to know";
+    }
+
+    if (state.points < cost) {
+        showPopup(
+            `You're broke. You need ${formatNumber(cost)} points.`,
+            "bruh",
+            "Close",
+            () => {}
+        );
+        return;
+    }
+
+    if (potionMultiplier !== 1) {
+        showPopup(
+            "Doing this will replace your current potion.",
+            "I know",
+            "Nevermind",
+            () => { if (state.points >= cost) { completePotionPurchase(cost, multiplier, duration, name); } }
+        );
+        return;
+    }
+
+    completePotionPurchase(cost, multiplier, duration, name);
+}
+function completePotionPurchase(cost, multiplier, duration, name) {
+    state.points -= cost;
+    activatePotion(multiplier, duration, name, statusEffect);
+    saveData();
+    updateUI();
+}
+function activatePotion(multiplier, duration, name, statusEffect = null) {
+
+    if (potionTimeout) clearTimeout(potionTimeout);
+    if (potionInterval) clearInterval(potionInterval);
+
+    potionMultiplier = multiplier;
+    activePotionName = name;
+    potionEndTime = Date.now() + duration;
+    activeStatusEffect = statusEffect;
+
+    document.getElementById("active-potion").textContent =
+        `${name} (${multiplier}x)`;
+
+const shopBar = document.getElementById("potion-timer-bar");
+const gameBar = document.getElementById("game-potion-bar");
+
+shopBar.style.width = "100%";
+gameBar.style.width = "100%";
+
+document.getElementById("game-potion-ui").style.display = "block";
+document.getElementById("game-active-potion").textContent = name;
+    
+const label = document.getElementById("game-active-potion");
+
+if (statusEffect) {
+    const color = statusColors[statusEffect] || "#ffffff";
+
+    label.innerHTML = `
+        ${name} 
+        <span style="color:${color}; font-weight:600;">
+            [${statusEffect.toUpperCase()}]
+        </span>
+    `;
+} else {
+    label.textContent = name;
+}
+
+    potionInterval = setInterval(() => {}, 9999999); // dummy, kept so clearInterval on re-use still works
+
+    let _potionRafId = null;
+    function _potionRafLoop() {
+        const remaining = potionEndTime - Date.now();
+        const percent = Math.max(0, (remaining / duration) * 100);
+        shopBar.style.width = percent + "%";
+        gameBar.style.width = percent + "%";
+        if (remaining > 0) {
+            _potionRafId = requestAnimationFrame(_potionRafLoop);
+        }
+    }
+    if (window._activePotionRafId) cancelAnimationFrame(window._activePotionRafId);
+    _potionRafId = requestAnimationFrame(_potionRafLoop);
+    window._activePotionRafId = _potionRafId;
+
+    potionTimeout = setTimeout(() => {
+        potionMultiplier = 1;
+        activePotionName = null;
+        bar.style.width = "0%";
+        document.getElementById("active-potion").textContent = "None";
+        updateUI();
+    }, duration);
+
+    updateUI();
+}
+
+        function calculatePrestigeBonus() {
+            return Math.round((state.rolls / 100000) * 10) / 10;
+        }
+
+        function triggerPrestige() {
+            const prestigeBonus = calculatePrestigeBonus();
+            
+            if (prestigeBonus <= 1) {
+                showPopup(
+                    `You need at least 100,000 total rolls to prestige.\nCurrent: ${formatNumber(state.rolls)}/100k`,
+                    "Shucks",
+                    "Aw man",
+                    () => {}
+                );
+                return;
+            }
+
+            showPopup(
+                `Ready to Prestige?\n\nYou'll gain +${prestigeBonus}x permanent luck!\n\n(Your progress will reset, but the luck bonus stays forever)`,
+                "PRESTIGE",
+                "Cancel",
+                () => {
+                    completePrestige(prestigeBonus);
+                }
+            );
+        }
+
+        function completePrestige(bonus) {
+            const preservedName = state.playerName;
+            const id100thisRun = state.inventory[100] || 0;
+            const alreadyUnlocked = state.heKnowsUnlocked || false;
+            const nowUnlocked = alreadyUnlocked || (id100thisRun === 7);
+            state = {
+                version: SAVE_VERSION,
+                inventory: {}, 
+                rolls: 0, 
+                points: 0, 
+                luckLevel: 1, 
+                luck: 1 + state.prestigeLuck + bonus, 
+                pity: 0,
+                playerName: preservedName,
+                redeemedCodes: state.redeemedCodes?.['BADPRESTIGE'] ? ['BADPRESTIGE'] : [],
+                prestigeCount: (state.prestigeCount || 0) + 1,
+                totalRolls: state.totalRolls,
+                prestigeLuck: state.prestigeLuck + bonus,
+                heKnowsUnlocked: nowUnlocked,
+            };
+
+            potionMultiplier = 1;
+            activePotionName = null;
+            activeStatusEffect = null;
+            potionEndTime = 0;
+            if (potionTimeout) clearTimeout(potionTimeout);
+            if (potionInterval) clearInterval(potionInterval);
+
+            saveDataNow();
+            location.reload();
+
+        }
+
+let nextGlobalAnnounceTime = Date.now();
+let nextGlobalRarity = null;
+
+function pickRandomRarity() {
+    const eligibleRarities = rarities.filter(r => r.id >= 25);
+
+    if (eligibleRarities.length === 0) return null;
+
+    const randomVal = Math.random();
+    const rarityIndex = Math.floor(Math.pow(randomVal, 2.2) * eligibleRarities.length);
+
+    return eligibleRarities[Math.min(eligibleRarities.length - 1, rarityIndex)];
+}
+
+function calculateWaitTime(rarity) {
+    const minWait = 4000;
+    const maxWait = 20000;
+    
+    const rarityFactor = rarity.id / rarities.length; 
+    const baseWait = minWait + (rarityFactor * (maxWait - minWait));
+    const randomVariation = (Math.random() - 0.5) * 4000; 
+    
+    return Math.max(minWait, baseWait + randomVariation);
+}
+
+function scheduleNextGlobalAnnounce() {
+    if (Math.random() < 0.05) {
+        nextGlobalAnnounceTime = Date.now() + 1000; 
+        nextGlobalRarity = pickRandomRarity();
+        return;
+    }
+    
+    nextGlobalRarity = pickRandomRarity();
+    const waitTime = calculateWaitTime(nextGlobalRarity);
+    nextGlobalAnnounceTime = Date.now() + waitTime;
+}
+
+function checkAndDisplayGlobalAnnounce() {
+    if (!nextGlobalRarity) {
+        scheduleNextGlobalAnnounce();
+        return;
+    }
+    
+    if (Date.now() >= nextGlobalAnnounceTime) {
+        const user = fakeUsers[Math.floor(Math.random() * fakeUsers.length)];
+        showAnnouncement(`[Global] ${user} rolled ${nextGlobalRarity.name}!`, nextGlobalRarity.color);
+        
+        scheduleNextGlobalAnnounce();
+    }
+}
+
+setInterval(checkAndDisplayGlobalAnnounce, 500);
+scheduleNextGlobalAnnounce();
+
+        function updateUI(result) {
+            const totalLuck = state.luck * potionMultiplier;
+            DOM.playerName.textContent  = state.playerName;
+            DOM.totalRolls.textContent  = formatNumber(state.totalRolls);
+            DOM.rolls.textContent       = formatNumber(state.rolls);
+            DOM.points.textContent      = formatNumber(state.points);
+            DOM.luck.textContent        = totalLuck.toFixed(2) + "x";
+            DOM.prestige.textContent    = formatNumber(state.prestigeCount);
+            DOM.pity.textContent        = state.pity;
+
+            if (result) {
+                DOM.rolledImage.style.display = 'block';
+                DOM.rolledImage.src = `images/${getFilename(result)}.png`;
+                DOM.rolledImage.onerror = () => { DOM.rolledImage.src = getPlaceholderSVG(result.color, result.name); };
+                
+                DOM.rolledName.textContent = result.name;
+                DOM.rolledName.style.color = result.color;
+                DOM.rolledName.className   = `efx-${result.effect}`;
+                DOM.rolledOdds.textContent = `1 in ${formatNumber(result.odds)}`;
+            }
+
+            const cost = getUpgradeCost();
+            DOM.btnUpgrade.textContent   = `Upgrade Luck (Cost: ${formatNumber(cost)})`;
+            DOM.btnUpgrade.style.opacity = state.points >= cost ? '1' : '0.5';
+
+            buildInventory();
+
+            const heKnowsBtn = document.getElementById('buy-he-knows');
+            if (heKnowsBtn) heKnowsBtn.style.display = state.heKnowsUnlocked ? '' : 'none';
+        }
+
+        function buildInventory() {
+            const grid = DOM.invGrid;
+            let unlockedCount = 0;
+            let highestId = 0;
+
+            rarities.forEach(r => {
+                const count = state.inventory[r.id] || 0;
+                const isUnlocked = count > 0;
+                if (isUnlocked) { unlockedCount++; if (r.id > highestId) highestId = r.id; }
+
+                let el = grid.querySelector(`[data-rarity-id="${r.id}"]`);
+
+                if (!el) {
+                    el = document.createElement('div');
+                    el.dataset.rarityId = r.id;
+                    el.className = `inv-item ${isUnlocked ? '' : 'locked'}`;
+
+                    if (isUnlocked) {
+                        el.style.borderColor = r.color;
+                        el.style.boxShadow = `inset 0 0 10px rgba(${hexToRgb(r.color)}, 0.2)`;
+                        const img = document.createElement('img');
+                        img.src = `images/${getFilename(r)}.png`;
+                        img.onerror = () => { img.src = getPlaceholderSVG(r.color, r.name); };
+                        el.appendChild(img);
+                        const badge = document.createElement('div');
+                        badge.className = 'item-count';
+                        badge.textContent = count > 999 ? '999+' : formatNumber(count);
+                        el.appendChild(badge);
+                        el.onmouseenter = (e) => showTooltip(e, r, count);
+                        el.onmousemove = moveTooltip;
+                        el.onmouseleave = hideTooltip;
+                        el.addEventListener('click', () => openInspect(r, state.inventory[r.id] || 0));
+                    }
+                    grid.appendChild(el);
+                } else {
+                    const wasLocked = el.classList.contains('locked');
+
+                    if (!wasLocked && isUnlocked) {
+                        const badge = el.querySelector('.item-count');
+                        if (badge) badge.textContent = count > 999 ? '999+' : formatNumber(count);
+                        el.onmouseenter = (e) => showTooltip(e, r, count);
+                        el.addEventListener('click', () => openInspect(r, state.inventory[r.id] || 0));
+                    } else if (wasLocked && isUnlocked) {
+                        el.className = 'inv-item';
+                        el.style.borderColor = r.color;
+                        el.style.boxShadow = `inset 0 0 10px rgba(${hexToRgb(r.color)}, 0.2)`;
+                        const img = document.createElement('img');
+                        img.src = `images/${getFilename(r)}.png`;
+                        img.onerror = () => { img.src = getPlaceholderSVG(r.color, r.name); };
+                        el.appendChild(img);
+                        const badge = document.createElement('div');
+                        badge.className = 'item-count';
+                        badge.textContent = count > 999 ? '999+' : formatNumber(count);
+                        el.appendChild(badge);
+                        el.onmouseenter = (e) => showTooltip(e, r, count);
+                        el.onmousemove = moveTooltip;
+                        el.onmouseleave = hideTooltip;
+                        el.addEventListener('click', () => openInspect(r, state.inventory[r.id] || 0));
+                    }
+                }
+            });
+
+            DOM.progressText.textContent = `${unlockedCount}/${rarities.length}`;
+            DOM.progressBar.style.width  = `${(unlockedCount / rarities.length) * 100}%`;
+
+            const highestName  = highestId > 0 ? rarities.find(r => r.id === highestId).name  : "None";
+            const highestColor = highestId > 0 ? rarities.find(r => r.id === highestId).color : "var(--text-muted)";
+            DOM.highestText.textContent  = highestName;
+            DOM.highestText.style.color  = highestColor;
+        }
+
+        const tooltip = document.getElementById('tooltip');
+        function showTooltip(e, rarity, count) {
+            tooltip.innerHTML = `<strong style="color:${rarity.color}">${rarity.name}</strong><br>Odds: 1 in ${formatNumber(rarity.odds)}<br>Owned: ${formatNumber(count)}<br>Value: +${formatNumber(rarity.val)} pts`;
+            tooltip.style.opacity = 1; moveTooltip(e);
+        }
+        function moveTooltip(e) { tooltip.style.left = e.pageX + 15 + 'px'; tooltip.style.top = e.pageY + 15 + 'px'; }
+        function hideTooltip() { tooltip.style.opacity = 0; }
+
+        const modal = document.getElementById('inspect-modal');
+        function openInspect(rarity, count) {
+            document.getElementById('inspect-image').src = `images/${getFilename(rarity)}.png`;
+            document.getElementById('inspect-image').onerror = (e) => { e.target.src = getPlaceholderSVG(rarity.color, rarity.name); };
+            const nameEl = document.getElementById('inspect-name');
+            nameEl.textContent = rarity.name; nameEl.style.color = rarity.color; nameEl.className = `efx-${rarity.effect}`;
+            document.getElementById('inspect-odds').textContent = `Odds: 1 in ${formatNumber(rarity.odds)}`;
+            document.getElementById('inspect-owned').textContent = `Owned: ${formatNumber(count)}`;
+            document.getElementById('inspect-value').textContent = `Value: +${formatNumber(rarity.val)} pts`;
+            modal.classList.add('active'); hideTooltip();
+        }
+        document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('active'));
+        document.getElementById("btn-shop").onclick = () => {
+        document.getElementById("shop-modal").classList.add("active");
+    };
+        document.getElementById("btn-close-shop").onclick = () => {
+            document.getElementById("shop-modal").classList.remove("active");
+        };
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255,255,255';
+        }
+
+        function saveData() { 
+            state.version = SAVE_VERSION; 
+            localStorage.setItem('absRngSave', JSON.stringify(state)); 
+        }
+        function loadData() {
+            const saved = localStorage.getItem('absRngSave');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (!parsed.version || parsed.version !== SAVE_VERSION) {
+                        console.log("Save version mismatch. Forcing reset.");
+                        resetSave(true); 
+                        return;
+                    }
+                    state = { ...state, ...parsed };
+                } catch (e) {
+                    console.log("Corrupt save. Resetting.");
+                    resetSave(true);
+                    return;
+                }
+            }
+            if (!state.playerName) {
+                const randomDigits = Math.floor(1000 + Math.random() * 9000);
+                state.playerName = `Guest_${randomDigits}`;
+                saveData();
+            }
+            if (state.prestigeCount === 0) {
+                state.totalRolls = state.rolls;
+            }
+            if(!state.prestigeLuck) {
+                state.prestigeLuck = 0
+            }
+            updateUI();
+        }
+        function resetSave(forced = false) {
+            const preservedName = state.playerName;
+
+            state = { 
+                inventory: {}, 
+                rolls: 0, 
+                points: 0, 
+                luckLevel: 1, 
+                luck: 1, 
+                pity: 0, 
+                playerName: preservedName,
+                redeemedCodes: [], 
+                prestigeCount: 0, 
+                totalRolls: 0,
+                prestigeLuck: 0
+                
+            };
+
+            saveDataNow();
+                alert("bon voyage LeNigga, update came up, yo save data went down.");
+
+            location.reload();
+        }
+
+        document.getElementById('btn-roll').addEventListener('click', triggerRoll);
+
+        document.getElementById('toggle-auto').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                if (isPlayingCutscene) return;
+                triggerRoll();
+                if(!isPlayingCutscene) autoRollInterval = setInterval(triggerRoll, 1000);
+            } else {
+                clearInterval(autoRollInterval);
+                autoRollInterval = null;
+            }
+        });
+
+        document.getElementById('btn-upgrade').addEventListener('click', () => {
+            const cost = getUpgradeCost();
+            if (state.points >= cost) {
+                state.points -= cost; state.luck += (1 + state.luckLevel * 0.25) * (state.prestigeLuck || 1); state.luckLevel += 1; saveData(); updateUI();
+                const btn = document.getElementById('btn-upgrade');
+                btn.textContent = "UPGRADED!"; btn.style.background = "var(--accent)";
+                setTimeout(() => { btn.style.background = ""; updateUI(); }, 500);
+            }
+        });
+
+        const settingsModal = document.getElementById('settings-modal');
+        document.getElementById('btn-settings').addEventListener('click', () => {
+            document.getElementById('input-name').value = state.playerName;
+            document.getElementById('code-message').textContent = ''; document.getElementById('input-code').value = '';
+            document.getElementById('btn-reset-progress').style.display = 'block'; document.getElementById('reset-confirm-area').style.display = 'none';
+            settingsModal.classList.add('active');
+        });
+        document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.remove('active'));
+        document.getElementById("buy-minor").addEventListener("click", () => buyPotion(1));
+        document.getElementById("buy-normal").addEventListener("click", () => buyPotion(2));
+        document.getElementById("buy-major").addEventListener("click", () => buyPotion(3));
+        document.getElementById("buy-god").addEventListener("click", () => buyPotion(4));
+        document.getElementById("buy-eclipse").addEventListener("click", () => buyPotion(5));
+        document.getElementById("buy-void").addEventListener("click", () => buyPotion(6));
+        document.getElementById("buy-chrono").addEventListener("click", () => buyPotion(7));
+        document.getElementById("buy-potent-eclipse").addEventListener("click", () => buyPotion(8));
+        document.getElementById("buy-potent-void").addEventListener("click", () => buyPotion(9));
+        document.getElementById("buy-potent-chrono").addEventListener("click", () => buyPotion(10));
+        document.getElementById("buy-eldritch").addEventListener("click", () => buyPotion(11));
+        document.getElementById("buy-virtue").addEventListener("click", () => buyPotion(12));
+        document.getElementById("buy-sin").addEventListener("click", () => buyPotion(13));
+        document.getElementById("buy-mortal").addEventListener("click", () => buyPotion(14));
+        document.getElementById("buy-grief").addEventListener("click", () => buyPotion(15));
+        document.getElementById("buy-growth").addEventListener("click", () => buyPotion(16));
+        document.getElementById("buy-question").addEventListener("click", () => buyPotion(17));
+        document.getElementById("buy-unknown").addEventListener("click", () => buyPotion(18));
+        document.getElementById("buy-he-knows").addEventListener("click", () => buyPotion(19));
+        document.getElementById('btn-save-name').addEventListener('click', () => {
+            const input = document.getElementById('input-name').value.trim();
+            if (input.length > 0 && input.length <= 32) {
+                state.playerName = input; saveDataNow(); updateUI();
+                const btn = document.getElementById('btn-save-name'); const origText = btn.textContent;
+                btn.textContent = "Saved!"; btn.style.background = "var(--accent)";
+                setTimeout(() => { btn.textContent = origText; btn.style.background = ""; }, 1000);
+            }
+        });
+
+        document.getElementById('btn-redeem').addEventListener('click', () => {
+            const code = document.getElementById('input-code').value.trim().toUpperCase();
+            const msgEl = document.getElementById('code-message');
+            if (!code) return;
+            if (state.redeemedCodes.includes(code)) { msgEl.textContent = "Code already redeemed!"; msgEl.style.color = "#ff6b6b"; return; }
+            if (validCodes[code]) {
+                const reward = validCodes[code]; 
+                state.points += reward; 
+                    if(reward === 67 && state.prestigeCount >= 1) { 
+                        for (let i = 1; i <= 30; i++) {
+                            state.inventory[i] = (state.inventory[i] || 0) + 1;
+                        }
+                    } 
+                state.redeemedCodes.push(code); saveData(); updateUI();
+                msgEl.textContent = `Success! +${formatNumber(reward)} points!`; msgEl.style.color = "#4CAF50";
+            } else { msgEl.textContent = "Invalid code!"; msgEl.style.color = "#ff6b6b"; }
+        });
+
+        document.getElementById('btn-reset-progress').addEventListener('click', () => {
+            document.getElementById('btn-reset-progress').style.display = 'none'; document.getElementById('reset-confirm-area').style.display = 'flex';
+        });
+        document.getElementById('btn-cancel-reset').addEventListener('click', () => {
+            document.getElementById('btn-reset-progress').style.display = 'block'; document.getElementById('reset-confirm-area').style.display = 'none';
+        });
+        document.getElementById('btn-confirm-reset').addEventListener('click', () => {
+        resetSave();
+        });
+        document.getElementById('btn-prestige').addEventListener('click', triggerPrestige);
+
+
+        (function initChat() {
+            const wrapper  = document.getElementById('chat-wrapper');
+            const tab      = document.getElementById('chat-tab');
+            const messages = document.getElementById('chat-messages');
+            const input    = document.getElementById('chat-input');
+            const sendBtn  = document.getElementById('chat-send');
+
+            let typingIndicatorEl  = null;
+            let pendingBotTimeout  = null;
+            let pendingPreTimeout  = null; 
+            let isOpen = false;
+
+            function clampLeft(x) {
+                const half = wrapper.offsetWidth / 2;
+                return Math.max(half, Math.min(window.innerWidth - half, x));
+            }
+            function setWrapperX(cx) {
+                wrapper.style.left      = cx + 'px';
+                wrapper.style.transform = 'translateX(-50%)';
+            }
+            setWrapperX(window.innerWidth / 2);
+            window.addEventListener('resize', () => {
+                const cur = parseFloat(wrapper.style.left) || window.innerWidth / 2;
+                setWrapperX(clampLeft(cur));
+            });
+
+            let dragStartX    = 0;
+            let dragStartLeft = 0;
+            let didDrag       = false;
+
+            tab.addEventListener('mousedown', e => {
+                if (e.button !== 0) return;
+                dragStartX    = e.clientX;
+                dragStartLeft = parseFloat(wrapper.style.left) || window.innerWidth / 2;
+                didDrag       = false;
+
+                function onMouseMove(e) {
+                    const dx = e.clientX - dragStartX;
+                    if (!didDrag && Math.abs(dx) > 4) {
+                        didDrag = true;
+                        wrapper.classList.add('dragging');
+                    }
+                    if (didDrag) {
+                        setWrapperX(clampLeft(dragStartLeft + dx));
+                    }
+                }
+
+                function onMouseUp() {
+                    wrapper.classList.remove('dragging');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            tab.addEventListener('touchstart', e => {
+                dragStartX    = e.touches[0].clientX;
+                dragStartLeft = parseFloat(wrapper.style.left) || window.innerWidth / 2;
+                didDrag       = false;
+            }, { passive: true });
+
+            tab.addEventListener('touchmove', e => {
+                const dx = e.touches[0].clientX - dragStartX;
+                if (!didDrag && Math.abs(dx) > 4) didDrag = true;
+                if (didDrag) setWrapperX(clampLeft(dragStartLeft + dx));
+            }, { passive: true });
+
+            tab.addEventListener('click', () => {
+                if (didDrag) return;
+                isOpen = !isOpen;
+                wrapper.classList.toggle('open', isOpen);
+            });
+
+            function addMessage(username, text, type) {
+                const div = document.createElement('div');
+                div.className = `chat-msg chat-${type}`;
+
+                if (type === 'system') {
+                    div.textContent = text;
+                } else {
+                    const userSpan = document.createElement('span');
+                    userSpan.className = 'chat-user';
+                    userSpan.textContent = username + ':';
+
+                    const textSpan = document.createElement('span');
+                    textSpan.className = 'chat-text';
+                    textSpan.textContent = ' ' + text;
+
+                    div.appendChild(userSpan);
+                    div.appendChild(textSpan);
+                }
+
+            messages.appendChild(div);
+            const allMsgs = messages.querySelectorAll('.chat-msg');
+            if (allMsgs.length > 40) {
+                for (let i = 0; i < allMsgs.length - 40; i++) {
+                    allMsgs[i].remove();
+                }
+            }
+            messages.scrollTop = messages.scrollHeight;
+            return div;
+            }
+
+            function showTyping(username) {
+                removeTyping();
+                const div = document.createElement('div');
+                div.className = 'chat-msg chat-bot';
+
+                const userSpan = document.createElement('span');
+                userSpan.className = 'chat-user';
+                userSpan.textContent = username + ':';
+
+                const dots = document.createElement('span');
+                dots.className = 'chat-typing-indicator';
+                dots.innerHTML = '<span></span><span></span><span></span>';
+
+                div.appendChild(userSpan);
+                div.appendChild(dots);
+                messages.appendChild(div);
+                messages.scrollTop = messages.scrollHeight;
+                typingIndicatorEl = div;
+            }
+
+            function removeTyping() {
+                if (typingIndicatorEl) { typingIndicatorEl.remove(); typingIndicatorEl = null; }
+            }
+
+            function randomBot() {
+                return fakeUsers[Math.floor(Math.random() * fakeUsers.length)];
+            }
+
+            function pickResponse(text) {
+                const lower = text.toLowerCase();
+                for (const trigger of CHAT_TRIGGERS) {
+                    if (trigger.keywords.some(kw => new RegExp(`(?<![a-z])${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z])`, 'i').test(lower))) {
+                        const pool = trigger.responses;
+                        return pool[Math.floor(Math.random() * pool.length)];
+                    }
+                }
+                return CHAT_AMBIENT[Math.floor(Math.random() * CHAT_AMBIENT.length)];
+            }
+
+            function sendMessage() {
+                const text = input.value.trim();
+                if (!text) return;
+                input.value = '';
+
+                const playerName = (typeof state !== 'undefined' && state.playerName)
+                    ? state.playerName : 'You';
+                addMessage(playerName, text, 'self');
+
+                if (pendingPreTimeout)  clearTimeout(pendingPreTimeout);
+                if (pendingBotTimeout)  clearTimeout(pendingBotTimeout);
+                removeTyping();
+
+                const botName  = randomBot();
+                const response = pickResponse(text);
+
+                const preDelay    = 1000 + Math.random() * 2000;
+                const typingDelay = 1000 + Math.random() * 1000;
+
+                pendingPreTimeout = setTimeout(() => {
+                    showTyping(botName);
+
+                    pendingBotTimeout = setTimeout(() => {
+                        removeTyping();
+                        addMessage(botName, response, 'bot');
+                        pendingBotTimeout = null;
+                    }, typingDelay);
+
+                    pendingPreTimeout = null;
+                }, preDelay);
+            }
+
+            sendBtn.addEventListener('click', sendMessage);
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+
+            function sendAmbient() {
+                const bot  = randomBot();
+                const text = CHAT_AMBIENT[Math.floor(Math.random() * CHAT_AMBIENT.length)];
+                const typingDelay = 800 + Math.random() * 1200;
+                showTyping(bot);
+                setTimeout(() => {
+                    removeTyping();
+                    addMessage(bot, text, 'bot');
+                }, typingDelay);
+            }
+
+            setTimeout(() => { sendAmbient(); }, Math.random * 2400);
+            setTimeout(() => { sendAmbient(); }, Math.random * 11000);
+
+            function scheduleNextAmbient() {
+                const delay = 20000 + Math.random() * 50000;
+                setTimeout(() => {
+                    sendAmbient();
+                    scheduleNextAmbient();
+                }, delay);
+            }
+            scheduleNextAmbient();
+
+            let convoBusy = false;
+
+            function playConversation(convo) {
+                if (convoBusy) return;
+                convoBusy = true;
+
+                const shuffled = [...fakeUsers].sort(() => Math.random() - 0.5);
+                const cast = shuffled.slice(0, convo.speakers);
+
+                let i = 0;
+                function nextMsg() {
+                    if (i >= convo.messages.length) {
+                        convoBusy = false;
+                        scheduleNextConversation();
+                        return;
+                    }
+                    const msg     = convo.messages[i++];
+                    const botName = cast[msg.speaker];
+                    const [lo, hi] = convo.gapMs;
+                    const gap      = lo + Math.random() * (hi - lo);
+                    const typing   = 700 + Math.random() * 1100;
+
+                    setTimeout(() => {
+                        showTyping(botName);
+                        setTimeout(() => {
+                            removeTyping();
+                            addMessage(botName, msg.text, 'bot');
+                            nextMsg();
+                        }, typing);
+                    }, gap);
+                }
+                nextMsg();
+            }
+
+            function scheduleNextConversation() {
+                const delay = 50000 + Math.random() * 90000;
+                setTimeout(() => {
+                    const convo = BOT_CONVERSATIONS[Math.floor(Math.random() * BOT_CONVERSATIONS.length)];
+                    playConversation(convo);
+                }, delay);
+            }
+
+            setTimeout(() => {
+                const convo = BOT_CONVERSATIONS[Math.floor(Math.random() * BOT_CONVERSATIONS.length)];
+                playConversation(convo);
+            }, 15000 + Math.random() * 20000);
+
+        })();
+
+        initDOM();
+        loadData();
+
+    </script>
+</body>
+</html>
